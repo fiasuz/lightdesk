@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <title>LiteDesk - Viewer</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="setup-screen" class="screen">
+    <div class="back-link" onclick="location.href='index.html'">&larr; Orqaga</div>
+    <h1>Boshqa kompyuterga ulanish</h1>
+    <div class="subtitle">Ulanmoqchi bo'lgan kompyuterning IP manzili va parolini kiriting</div>
+    <div class="card">
+      <label>IP manzil</label>
+      <input id="ip" type="text" placeholder="masalan: 192.168.1.24" />
+
+      <label>Port</label>
+      <input id="port" type="number" value="5900" />
+
+      <label>Parol (PIN)</label>
+      <input id="password" type="text" />
+
+      <button class="primary" id="connect-btn">Ulanish</button>
+      <div class="status" id="status"></div>
+    </div>
+  </div>
+
+  <div id="remote-screen" class="viewer-wrap" style="display:none;">
+    <div class="topbar">
+      <span class="dot"></span>
+      <span id="remote-info">Ulandi</span>
+      <button id="disconnect-btn">Uzish</button>
+    </div>
+    <canvas id="remote-canvas"></canvas>
+  </div>
+
+  <script src="viewer.js"></script>
+</body>
+</html>

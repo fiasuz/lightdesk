@@ -1,0 +1,20 @@
+{
+  "name": "litedesk",
+  "version": "1.0.0",
+  "description": "Simple LAN remote desktop (view + mouse control) for Windows and macOS",
+  "main": "src/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "@nut-tree-fork/nut-js": "^4.2.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0"
+  },
+  "allowScripts": {
+    "electron@32.3.3": true
+  }
+}

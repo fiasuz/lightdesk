@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <title>LiteDesk - Host</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="back-link" onclick="location.href='index.html'">&larr; Orqaga</div>
+  <div class="screen">
+    <h1>Bu kompyuterni ulashish</h1>
+    <div class="subtitle">Boshqa kompyuter shu manzil va parol orqali ulanadi</div>
+
+    <div class="card" id="setup-card">
+      <label>Ekran</label>
+      <select id="source-select"></select>
+
+      <label>Port</label>
+      <input id="port" type="number" value="5900" />
+
+      <label>Parol (PIN)</label>
+      <input id="password" type="text" />
+
+      <div id="mac-warning" class="status err" style="display:none;"></div>
+
+      <button class="primary" id="start-btn">Ulashishni boshlash</button>
+      <div class="status" id="status"></div>
+    </div>
+
+    <div class="card" id="running-card" style="display:none;">
+      <div class="ip-list" id="ip-list"></div>
+      <label style="margin-top:16px;">PIN</label>
+      <div class="pin-display" id="pin-display"></div>
+      <div class="status" id="conn-status">Ulanish kutilmoqda...</div>
+      <button class="secondary" id="stop-btn">To'xtatish</button>
+    </div>
+  </div>
+
+  <script src="host.js"></script>
+</body>
+</html>
