@@ -114,13 +114,34 @@ public partial class ViewerView : UserControl
         });
     }
 
+    // TEMP DIAGNOSTIC — remove once the live-move bug is root-caused.
+    private static void DebugLog(string line)
+    {
+        try
+        {
+            string path = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "litedesk-viewer-debug.log");
+            System.IO.File.AppendAllText(path, $"{DateTime.Now:HH:mm:ss.fff} VIEW {line}{Environment.NewLine}");
+        }
+        catch { /* diagnostic only */ }
+    }
+
     private void RemoteImage_MouseMove(object sender, MouseEventArgs e)
     {
         long now = _stopwatch.ElapsedMilliseconds;
-        if (now - _lastMouseMoveMs < MouseThrottleMs) return;
+        if (now - _lastMouseMoveMs < MouseThrottleMs)
+        {
+            DebugLog("MouseMove fired, throttled");
+            return;
+        }
         _lastMouseMoveMs = now;
 
-        if (!TryGetNormalizedPosition(e, out double x, out double y)) return;
+        if (!TryGetNormalizedPosition(e, out double x, out double y))
+        {
+            DebugLog("MouseMove fired, TryGetNormalizedPosition FAILED (outside displayed image / no frame yet)");
+            return;
+        }
+        DebugLog($"MouseMove fired, sending x={x:F3} y={y:F3}");
         _ = _client.SendMouseEventAsync(new MouseMoveMessage { X = x, Y = y });
     }
 

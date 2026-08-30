@@ -26,6 +26,8 @@ final class MouseInjector {
     }
 
     private func process(_ message: MouseMessage, screenSize: CGSize) {
+        // TEMP DIAGNOSTIC — remove once the live-move bug is root-caused.
+        WebSocketServer.debugLog("INJECT \(message) trusted=\(isTrusted()) screenSize=\(screenSize)")
         guard isTrusted() else { return }
 
         switch message {

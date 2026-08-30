@@ -98,10 +98,29 @@ public sealed class ViewerClient
 
     // Sends mouse-move/down/up/scroll messages while connected; driven by
     // Views/ViewerView.xaml.cs's local input capture.
+    // TEMP DIAGNOSTIC — remove once the live-move bug is root-caused.
+    private static readonly object DebugLogLock = new();
+    private static void DebugLog(string line)
+    {
+        try
+        {
+            string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "litedesk-viewer-debug.log");
+            lock (DebugLogLock)
+            {
+                File.AppendAllText(path, $"{DateTime.Now:HH:mm:ss.fff} {line}{Environment.NewLine}");
+            }
+        }
+        catch { /* diagnostic only */ }
+    }
+
     public async Task SendMouseEventAsync(WireMessage message)
     {
         ClientWebSocket? socket = _socket;
-        if (socket is null || socket.State != WebSocketState.Open) return;
+        if (socket is null || socket.State != WebSocketState.Open)
+        {
+            DebugLog($"SKIP (socket not open) {message.Type}");
+            return;
+        }
 
         await _sendLock.WaitAsync().ConfigureAwait(false);
         try
@@ -109,6 +128,7 @@ public sealed class ViewerClient
             if (socket.State != WebSocketState.Open) return;
 
             string json = JsonSerializer.Serialize(message, message.GetType());
+            DebugLog($"SEND {json}");
             await socket.SendAsync(Encoding.UTF8.GetBytes(json), WebSocketMessageType.Text, true, CancellationToken.None)
                 .ConfigureAwait(false);
         }

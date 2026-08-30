@@ -248,8 +248,28 @@ final class WebSocketServer {
             handleAuth(payload, client: client)
             return
         }
+        // TEMP DIAGNOSTIC — remove once the live-move bug is root-caused.
+        WebSocketServer.debugLog("RECV \(String(data: payload, encoding: .utf8) ?? "<non-utf8>")")
         if let message = MouseMessage.parse(payload) {
             onMouseMessage?(message)
+        } else {
+            WebSocketServer.debugLog("PARSE FAILED for above payload")
+        }
+    }
+
+    // TEMP DIAGNOSTIC — remove once the live-move bug is root-caused.
+    static func debugLog(_ line: String) {
+        let path = NSHomeDirectory() + "/Desktop/litedesk-host-debug.log"
+        let stamp = ISO8601DateFormatter().string(from: Date())
+        let entry = "\(stamp) \(line)\n"
+        if let data = entry.data(using: .utf8) {
+            if FileManager.default.fileExists(atPath: path), let handle = FileHandle(forWritingAtPath: path) {
+                handle.seekToEndOfFile()
+                handle.write(data)
+                handle.closeFile()
+            } else {
+                try? data.write(to: URL(fileURLWithPath: path))
+            }
         }
     }
 
