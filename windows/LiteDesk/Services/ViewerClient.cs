@@ -19,6 +19,15 @@ public sealed class ViewerClient
     private ClientWebSocket? _socket;
     private CancellationTokenSource? _cts;
 
+    // ClientWebSocket allows only one outstanding SendAsync at a time; a
+    // second concurrent call throws InvalidOperationException. MouseMove
+    // fires fire-and-forget on every pointer move (up to ~40/s), so without
+    // serializing here, a move whose send is still in flight when the next
+    // one starts would throw and get silently dropped by the catch below —
+    // live cursor movement would go missing while rarer MouseDown/Up sends
+    // (which don't overlap) kept working.
+    private readonly SemaphoreSlim _sendLock = new(1, 1);
+
     public event Action<byte[]>? FrameReceived;
     public event Action? ConnectionClosed;
 
@@ -94,8 +103,11 @@ public sealed class ViewerClient
         ClientWebSocket? socket = _socket;
         if (socket is null || socket.State != WebSocketState.Open) return;
 
+        await _sendLock.WaitAsync().ConfigureAwait(false);
         try
         {
+            if (socket.State != WebSocketState.Open) return;
+
             string json = JsonSerializer.Serialize(message, message.GetType());
             await socket.SendAsync(Encoding.UTF8.GetBytes(json), WebSocketMessageType.Text, true, CancellationToken.None)
                 .ConfigureAwait(false);
@@ -104,6 +116,10 @@ public sealed class ViewerClient
         {
             // Connection likely closing; the receive loop will raise
             // ConnectionClosed.
+        }
+        finally
+        {
+            _sendLock.Release();
         }
     }
 
