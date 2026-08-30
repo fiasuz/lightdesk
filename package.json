@@ -5,16 +5,34 @@
   "main": "src/main.js",
   "private": true,
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build:win": "electron-builder --win --x64"
   },
   "dependencies": {
     "@nut-tree-fork/nut-js": "^4.2.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "electron": "^32.0.0"
+    "electron": "^32.0.0",
+    "electron-builder": "^26.15.3"
   },
   "allowScripts": {
     "electron@32.3.3": true
+  },
+  "build": {
+    "appId": "com.litedesk.app",
+    "productName": "LiteDesk",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        { "target": "zip", "arch": ["x64"] }
+      ]
+    }
   }
 }

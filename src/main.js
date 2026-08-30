@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, desktopCapturer, screen, systemPreferences } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, systemPreferences } = require('electron');
 const path = require('path');
 const os = require('os');
 const WebSocket = require('ws');
@@ -87,7 +87,7 @@ function enqueueMouseMsg(msg) {
 }
 
 async function handleMouseMsg(msg) {
-  const { width, height } = screen.getPrimaryDisplay().size;
+  const { width, height } = await mouseControl.getScreenSize();
   const x = Math.min(Math.max(msg.x, 0), 1) * width;
   const y = Math.min(Math.max(msg.y, 0), 1) * height;
   switch (msg.type) {
@@ -127,7 +127,7 @@ ipcMain.handle('start-host', async (event, { port, password }) => {
     }
     socket.authenticated = false;
 
-    socket.on('message', (data, isBinary) => {
+    socket.on('message', async (data, isBinary) => {
       if (isBinary) return;
       let msg;
       try { msg = JSON.parse(data.toString()); } catch (e) { return; }
@@ -136,7 +136,7 @@ ipcMain.handle('start-host', async (event, { port, password }) => {
         if (msg.password === hostPassword) {
           socket.authenticated = true;
           hostSocket = socket;
-          const { width, height } = screen.getPrimaryDisplay().size;
+          const { width, height } = await mouseControl.getScreenSize();
           socket.send(JSON.stringify({ type: 'auth-ok', width, height }));
           if (mainWindow) mainWindow.webContents.send('viewer-connected');
         } else {
