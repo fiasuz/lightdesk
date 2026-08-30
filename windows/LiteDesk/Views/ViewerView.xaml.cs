@@ -20,7 +20,14 @@ public partial class ViewerView : UserControl
     private readonly MainWindow _window;
     private readonly ViewerClient _client = new();
     private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
-    private long _lastMouseMoveMs = long.MinValue;
+    // Not long.MinValue: `now - _lastMouseMoveMs` in RemoteImage_MouseMove
+    // overflows a signed long when subtracting MinValue (wraps to a huge
+    // negative number in unchecked arithmetic), which made the throttle
+    // check permanently true — every mouse-move was silently dropped,
+    // forever, from the very first call onward. -MouseThrottleMs guarantees
+    // `now - _lastMouseMoveMs >= MouseThrottleMs` on the first real call
+    // (now is always >= 0) without any overflow risk.
+    private long _lastMouseMoveMs = -MouseThrottleMs;
 
     public ViewerView(MainWindow window)
     {
