@@ -29,15 +29,18 @@ final class HostSession: ObservableObject {
         }
         server.onMouseMessage = { [weak self] message in
             guard let self else { return }
-            let size = NSScreen.main?.frame.size ?? .zero
-            self.mouseInjector.handle(message, screenSize: size)
+            self.mouseInjector.handle(message, screenSize: Self.mainDisplaySize())
         }
-        // Point-space (NSScreen.frame), matching what MouseInjector's CGEvent
-        // coordinates use — see MouseCoordinateMath. This is an intentional
-        // change from the old nut-js/hardware-pixel convention; the viewer
-        // doesn't consume these values for anything, so it's safe.
+        // CGDisplayBounds(CGMainDisplayID()), not NSScreen.main: this callback
+        // (and screenSizeProvider below) fire on WebSocketServer's background
+        // queue, and NSScreen.main is an AppKit call that's only safe on the
+        // main thread — off-thread it can intermittently return nil, which
+        // silently fell back to CGSize.zero and collapsed every coordinate to
+        // (0,0). CGDisplayBounds is a plain CoreGraphics C call (thread-safe)
+        // and also matches ScreenCapture's own CGMainDisplayID() selection,
+        // in the same top-left-origin space CGEvent expects.
         server.screenSizeProvider = {
-            let size = NSScreen.main?.frame.size ?? .zero
+            let size = Self.mainDisplaySize()
             return (width: Int(size.width), height: Int(size.height))
         }
 
@@ -81,5 +84,9 @@ final class HostSession: ObservableObject {
         server.stop()
         isRunning = false
         viewerConnected = false
+    }
+
+    private static func mainDisplaySize() -> CGSize {
+        CGDisplayBounds(CGMainDisplayID()).size
     }
 }

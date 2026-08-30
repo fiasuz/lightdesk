@@ -35,6 +35,14 @@ final class MouseInjector {
 
         case .down(let x, let y, let buttonName):
             currentPosition = MouseCoordinateMath.point(forNormalizedX: x, y: y, screenSize: screenSize)
+            // Post an explicit .mouseMoved to currentPosition before the
+            // click: on macOS, leftMouseDown/Up's mouseCursorPosition field
+            // does not reliably warp the *visible* cursor by itself — only
+            // .mouseMoved/*Dragged events do. Without this, a down that
+            // isn't preceded by a move to the same spot makes the cursor
+            // jump on click. Mirrors windows/.../MouseInjector.cs's explicit
+            // MoveTo() before ButtonEvent().
+            post(CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: currentPosition, mouseButton: .left))
             let button = cgButton(for: buttonName)
             currentlyPressedButton = button
             post(buttonEvent(down: true, button: button))
