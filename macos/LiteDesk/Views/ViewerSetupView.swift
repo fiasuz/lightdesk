@@ -1,9 +1,17 @@
 import SwiftUI
 
+private enum ConnectionMode: String, CaseIterable, Identifiable {
+    case lan = "LAN"
+    case internet = "Internet"
+    var id: String { rawValue }
+}
+
 struct ViewerSetupView: View {
     @ObservedObject var session: ViewerSession
+    @State private var mode: ConnectionMode = .lan
     @State private var ip: String = ""
     @State private var port: String = "5900"
+    @State private var tunnelAddress: String = ""
     @State private var password: String = ""
     @State private var statusText: String = ""
     @State private var isConnecting = false
@@ -19,11 +27,24 @@ struct ViewerSetupView: View {
             }
 
             VStack(alignment: .leading, spacing: 14) {
-                FormField(label: "IP manzil") {
-                    TextField("masalan: 192.168.1.24", text: $ip).textFieldStyle(.roundedBorder)
+                Picker("", selection: $mode) {
+                    ForEach(ConnectionMode.allCases) { Text($0.rawValue).tag($0) }
                 }
-                FormField(label: "Port") {
-                    TextField("", text: $port).textFieldStyle(.roundedBorder)
+                .pickerStyle(.segmented)
+                .labelsHidden()
+
+                if mode == .lan {
+                    FormField(label: "IP manzil") {
+                        TextField("masalan: 192.168.1.24", text: $ip).textFieldStyle(.roundedBorder)
+                    }
+                    FormField(label: "Port") {
+                        TextField("", text: $port).textFieldStyle(.roundedBorder)
+                    }
+                } else {
+                    FormField(label: "Tunnel manzili") {
+                        TextField("masalan: xxxx.trycloudflare.com", text: $tunnelAddress)
+                            .textFieldStyle(.roundedBorder)
+                    }
                 }
                 FormField(label: "Parol (PIN)") {
                     TextField("", text: $password).textFieldStyle(.roundedBorder)
@@ -49,19 +70,54 @@ struct ViewerSetupView: View {
     }
 
     private func connect() {
-        let trimmedIp = ip.trimmingCharacters(in: .whitespaces)
         let trimmedPassword = password.trimmingCharacters(in: .whitespaces)
-        guard !trimmedIp.isEmpty, !trimmedPassword.isEmpty else {
-            statusText = "IP va parolni kiriting"
+        guard !trimmedPassword.isEmpty else {
+            statusText = "Parolni kiriting"
             return
         }
+
+        let resolvedIp: String
+        let resolvedPort: Int?
+        let useTLS: Bool
+
+        switch mode {
+        case .lan:
+            let trimmedIp = ip.trimmingCharacters(in: .whitespaces)
+            guard !trimmedIp.isEmpty else {
+                statusText = "IP manzilni kiriting"
+                return
+            }
+            resolvedIp = trimmedIp
+            resolvedPort = Int(port) ?? 5900
+            useTLS = false
+        case .internet:
+            let cleanedAddress = Self.stripSchemeAndSlashes(tunnelAddress)
+            guard !cleanedAddress.isEmpty else {
+                statusText = "Tunnel manzilini kiriting"
+                return
+            }
+            resolvedIp = cleanedAddress
+            resolvedPort = nil
+            useTLS = true
+        }
+
         isConnecting = true
         statusText = ""
-        session.connect(ip: trimmedIp, port: Int(port) ?? 5900, password: trimmedPassword) { success, error in
+        session.connect(ip: resolvedIp, port: resolvedPort, useTLS: useTLS, password: trimmedPassword) { success, error in
             isConnecting = false
             if !success {
                 statusText = "Xato: " + (error ?? "")
             }
         }
+    }
+
+    /// Lets the user paste a full URL (`https://xxxx.trycloudflare.com`) or
+    /// just the bare hostname — both should work.
+    private static func stripSchemeAndSlashes(_ raw: String) -> String {
+        var address = raw.trimmingCharacters(in: .whitespaces)
+        for prefix in ["https://", "wss://", "http://", "ws://"] where address.hasPrefix(prefix) {
+            address.removeFirst(prefix.count)
+        }
+        return address.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     }
 }

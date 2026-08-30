@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct HostRunningView: View {
     @ObservedObject var session: HostSession
@@ -18,6 +19,8 @@ struct HostRunningView: View {
                         .tracking(6)
                         .foregroundColor(Palette.accent)
                 }
+
+                tunnelSection
 
                 Text(session.viewerConnected
                      ? "Ulandi — masofaviy foydalanuvchi sichqonchani boshqarmoqda"
@@ -40,8 +43,40 @@ struct HostRunningView: View {
     }
 
     private var ipListText: String {
-        session.localIPs.isEmpty
+        let base = session.localIPs.isEmpty
             ? "IP manzil topilmadi"
             : session.localIPs.joined(separator: ", ") + " manzillaridan biri"
+        return base + " (port: \(session.port))"
+    }
+
+    @ViewBuilder
+    private var tunnelSection: some View {
+        switch session.tunnelState {
+        case .idle:
+            EmptyView()
+        case .starting:
+            Text("Internet tunnel ochilmoqda...")
+                .font(.system(size: 12))
+                .foregroundColor(Palette.subtitle)
+        case .running(let url):
+            VStack(spacing: 6) {
+                Text("Internet orqali manzil").font(.system(size: 12)).foregroundColor(Palette.subtitle)
+                Text(url)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(Palette.accent)
+                    .textSelection(.enabled)
+                Button("Nusxalash") {
+                    let pasteboard = NSPasteboard.general
+                    pasteboard.clearContents()
+                    pasteboard.setString(url, forType: .string)
+                }
+                .buttonStyle(.link)
+                .font(.system(size: 12))
+            }
+        case .failed(let message):
+            Text("Internet tunnel xatosi: \(message)")
+                .font(.system(size: 12))
+                .foregroundColor(Palette.err)
+        }
     }
 }

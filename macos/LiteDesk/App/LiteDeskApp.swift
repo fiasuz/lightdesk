@@ -38,4 +38,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
     }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        // Belt-and-suspenders: Process doesn't auto-kill children when this
+        // app exits, so make sure no cloudflared tunnel is left running.
+        CloudflaredTunnelManager.stopAll()
+    }
 }

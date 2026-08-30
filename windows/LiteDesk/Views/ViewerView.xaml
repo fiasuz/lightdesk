@@ -16,11 +16,28 @@
 
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
-                        <TextBlock Text="IP manzil" Style="{StaticResource CardLabel}" Margin="0,0,0,6"/>
-                        <TextBox x:Name="IpBox"/>
+                        <TextBlock Text="Ulanish turi" Style="{StaticResource CardLabel}" Margin="0,0,0,6"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                            <RadioButton x:Name="LanModeRadio" Content="LAN" GroupName="ConnectMode" IsChecked="True"
+                                         Foreground="{StaticResource TextBrush}" FontSize="13" Margin="0,0,20,0"
+                                         Checked="ConnectMode_Changed"/>
+                            <RadioButton x:Name="InternetModeRadio" Content="Internet (Cloudflare Tunnel)" GroupName="ConnectMode"
+                                         Foreground="{StaticResource TextBrush}" FontSize="13"
+                                         Checked="ConnectMode_Changed"/>
+                        </StackPanel>
 
-                        <TextBlock Text="Port" Style="{StaticResource CardLabel}"/>
-                        <TextBox x:Name="PortBox" Text="5900"/>
+                        <StackPanel x:Name="LanFieldsPanel">
+                            <TextBlock Text="IP manzil" Style="{StaticResource CardLabel}" Margin="0,0,0,6"/>
+                            <TextBox x:Name="IpBox"/>
+
+                            <TextBlock Text="Port" Style="{StaticResource CardLabel}"/>
+                            <TextBox x:Name="PortBox" Text="5900"/>
+                        </StackPanel>
+
+                        <StackPanel x:Name="InternetFieldsPanel" Visibility="Collapsed">
+                            <TextBlock Text="Tunnel manzili" Style="{StaticResource CardLabel}" Margin="0,0,0,6"/>
+                            <TextBox x:Name="TunnelAddressBox"/>
+                        </StackPanel>
 
                         <TextBlock Text="Parol (PIN)" Style="{StaticResource CardLabel}"/>
                         <TextBox x:Name="PasswordBox"/>

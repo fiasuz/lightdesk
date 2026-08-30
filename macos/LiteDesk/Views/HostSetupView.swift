@@ -5,6 +5,7 @@ struct HostSetupView: View {
     @ObservedObject var session: HostSession
     @State private var port: String = "5900"
     @State private var password: String = String(format: "%06d", Int.random(in: 100_000...999_999))
+    @State private var useTunnel: Bool = false
 
     var body: some View {
         VStack(spacing: 24) {
@@ -24,6 +25,12 @@ struct HostSetupView: View {
                     TextField("", text: $password).textFieldStyle(.roundedBorder)
                 }
 
+                Toggle("Internet orqali ham ulash (Cloudflare Tunnel)", isOn: $useTunnel)
+                    .toggleStyle(.checkbox)
+                Text("Boshqa tarmoqdagi qurilma ham ulana oladi — bepul, router sozlash shart emas.")
+                    .font(.system(size: 11))
+                    .foregroundColor(Palette.subtitle)
+
                 if !session.permissions.allGranted {
                     Text("macOS: Ekran yozish va Accessibility ruxsatlarini bering (Tizim sozlamalari > Maxfiylik va xavfsizlik), so'ng ilovani qayta ishga tushiring.")
                         .foregroundColor(Palette.err)
@@ -36,7 +43,7 @@ struct HostSetupView: View {
 
                 Button("Ulashishni boshlash") {
                     let portNumber = UInt16(port) ?? 5900
-                    session.start(port: portNumber, password: password)
+                    session.start(port: portNumber, password: password, useTunnel: useTunnel)
                 }
                 .buttonStyle(.borderedProminent)
                 .frame(maxWidth: .infinity)

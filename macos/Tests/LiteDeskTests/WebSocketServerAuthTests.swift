@@ -121,4 +121,57 @@ final class WebSocketServerAuthTests: XCTestCase {
         wait(for: [busyExpectation], timeout: 5.0)
         XCTAssertEqual(secondTask.closeCode, .normalClosure)
     }
+
+    // Now that the host may be reachable from the whole internet via a
+    // Cloudflare Tunnel rather than only the LAN, repeated wrong-password
+    // attempts from the same remote IP must eventually get locked out.
+    func testRepeatedWrongPasswordAttemptsAreLockedOut() throws {
+        let server = WebSocketServer()
+        server.screenSizeProvider = { () in (width: 100, height: 100) }
+        let port = randomPort()
+        try server.start(port: port, password: "correct-horse-battery")
+        defer { server.stop() }
+
+        let session = URLSession(configuration: .default)
+
+        func attemptWrongAuth() {
+            let task = session.webSocketTask(with: URL(string: "ws://127.0.0.1:\(port)/")!)
+            task.resume()
+
+            let authMessage = AuthMessage(password: "nope")
+            let authData = try! JSONEncoder().encode(authMessage)
+            task.send(.string(String(data: authData, encoding: .utf8)!)) { _ in }
+
+            let failedExpectation = expectation(description: "auth-fail received")
+            task.receive { result in
+                if case .success(.string(let text)) = result,
+                   let data = text.data(using: .utf8),
+                   let envelope = try? JSONDecoder().decode(TypeEnvelope.self, from: data),
+                   envelope.type == "auth-fail" {
+                    failedExpectation.fulfill()
+                }
+            }
+            wait(for: [failedExpectation], timeout: 3.0)
+            task.cancel(with: .normalClosure, reason: nil)
+        }
+
+        for _ in 0..<5 {
+            attemptWrongAuth()
+        }
+
+        // The 6th connection attempt from the same IP should be rejected
+        // outright — the server cancels it before ever completing the
+        // WebSocket upgrade handshake.
+        let blockedTask = session.webSocketTask(with: URL(string: "ws://127.0.0.1:\(port)/")!)
+        blockedTask.resume()
+        defer { blockedTask.cancel(with: .normalClosure, reason: nil) }
+
+        let rejectedExpectation = expectation(description: "connection rejected due to lockout")
+        blockedTask.receive { result in
+            if case .failure = result {
+                rejectedExpectation.fulfill()
+            }
+        }
+        wait(for: [rejectedExpectation], timeout: 3.0)
+    }
 }

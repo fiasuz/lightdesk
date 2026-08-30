@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -29,6 +30,23 @@ public sealed class HostServer
     private CancellationTokenSource? _cts;
     private WebSocket? _viewerSocket;
     private string _password = "";
+
+    // Exposing the WebSocket server to the whole internet via a Cloudflare
+    // Tunnel (see CloudflareTunnelService) turns the previously-harmless
+    // "no rate limiting" PIN check into a real brute-force risk. Track
+    // failed attempts per remote IP and temporarily lock out repeat
+    // offenders — reset on Start()/Stop() since it's an in-memory-only,
+    // best-effort guard, not a persisted security boundary.
+    private const int MaxAuthFailuresBeforeLockout = 5;
+    private static readonly TimeSpan AuthLockoutWindow = TimeSpan.FromMinutes(5);
+    private readonly ConcurrentDictionary<IPAddress, AuthAttemptState> _authFailures = new();
+
+    private sealed class AuthAttemptState
+    {
+        public int FailureCount;
+        public DateTime WindowStartUtc;
+        public DateTime LockedUntilUtc;
+    }
 
     public event Action? ViewerConnected;
     public event Action? ViewerDisconnected;
@@ -95,6 +113,7 @@ public sealed class HostServer
 
         try { _listener?.Stop(); } catch { /* ignore */ }
         _listener = null;
+        _authFailures.Clear();
 
         _screenCapture.Stop();
         _mouseInjector.Stop();
@@ -152,6 +171,14 @@ public sealed class HostServer
     {
         using (client)
         {
+            IPAddress? remoteAddress = (client.Client.RemoteEndPoint as IPEndPoint)?.Address;
+            if (IsLockedOut(remoteAddress))
+            {
+                // Too many recent failed PIN attempts from this address —
+                // drop silently, don't even spend a handshake on it.
+                return;
+            }
+
             NetworkStream stream = client.GetStream();
 
             bool handshakeOk;
@@ -185,7 +212,7 @@ public sealed class HostServer
 
             try
             {
-                await RunConnectionAsync(socket, ct).ConfigureAwait(false);
+                await RunConnectionAsync(socket, remoteAddress, ct).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -204,7 +231,7 @@ public sealed class HostServer
         }
     }
 
-    private async Task RunConnectionAsync(WebSocket socket, CancellationToken ct)
+    private async Task RunConnectionAsync(WebSocket socket, IPAddress? remoteAddress, CancellationToken ct)
     {
         var buffer = new ArraySegment<byte>(new byte[64 * 1024]);
         bool authenticated = false;
@@ -226,6 +253,7 @@ public sealed class HostServer
                 if (auth.Password == _password)
                 {
                     authenticated = true;
+                    ClearAuthFailures(remoteAddress);
                     (int w, int h) = ScreenCapture.GetPrimaryMonitorSize();
                     await SendJsonAsync(socket, new AuthOkMessage { Width = w, Height = h }, ct).ConfigureAwait(false);
 
@@ -234,6 +262,10 @@ public sealed class HostServer
                 }
                 else
                 {
+                    RecordAuthFailure(remoteAddress);
+                    // Slow down automated brute-forcing now that this port
+                    // may be reachable from the whole internet via tunnel.
+                    await Task.Delay(500, ct).ConfigureAwait(false);
                     await SendJsonAsync(socket, new AuthFailMessage(), ct).ConfigureAwait(false);
                     try
                     {
@@ -255,6 +287,40 @@ public sealed class HostServer
                 _keyInjector.Enqueue(msg);
             }
         }
+    }
+
+    private bool IsLockedOut(IPAddress? address)
+    {
+        if (address is null) return false;
+        if (!_authFailures.TryGetValue(address, out AuthAttemptState? state)) return false;
+        lock (state) { return DateTime.UtcNow < state.LockedUntilUtc; }
+    }
+
+    private void RecordAuthFailure(IPAddress? address)
+    {
+        if (address is null) return;
+
+        AuthAttemptState state = _authFailures.GetOrAdd(address, _ => new AuthAttemptState());
+        lock (state)
+        {
+            DateTime now = DateTime.UtcNow;
+            if (now - state.WindowStartUtc > AuthLockoutWindow)
+            {
+                state.WindowStartUtc = now;
+                state.FailureCount = 0;
+            }
+
+            state.FailureCount++;
+            if (state.FailureCount >= MaxAuthFailuresBeforeLockout)
+            {
+                state.LockedUntilUtc = now + AuthLockoutWindow;
+            }
+        }
+    }
+
+    private void ClearAuthFailures(IPAddress? address)
+    {
+        if (address is not null) _authFailures.TryRemove(address, out _);
     }
 
     private static async Task SendJsonAsync(WebSocket socket, WireMessage message, CancellationToken ct)

@@ -11,7 +11,7 @@ final class ViewerSession: ObservableObject {
     /// path. Set by the NSViewRepresentable hosting RemoteSurfaceView.
     var onFrame: ((Data) -> Void)?
 
-    func connect(ip: String, port: Int, password: String, completion: @escaping (Bool, String?) -> Void) {
+    func connect(ip: String, port: Int? = nil, useTLS: Bool = false, password: String, completion: @escaping (Bool, String?) -> Void) {
         client.onAuthResult = { [weak self] (outcome: ViewerAuthOutcome) in
             DispatchQueue.main.async {
                 switch outcome {
@@ -32,7 +32,7 @@ final class ViewerSession: ObservableObject {
         client.onFrame = { [weak self] data in
             self?.onFrame?(data)
         }
-        client.connect(ip: ip, port: port, password: password)
+        client.connect(ip: ip, port: port, useTLS: useTLS, password: password)
     }
 
     func disconnect() {

@@ -15,6 +15,7 @@ public partial class HostView : UserControl
 {
     private readonly MainWindow _window;
     private readonly HostServer _server = new();
+    private readonly CloudflareTunnelService _tunnel = new();
 
     public HostView(MainWindow window)
     {
@@ -26,8 +27,13 @@ public partial class HostView : UserControl
         _server.ViewerConnected += OnViewerConnected;
         _server.ViewerDisconnected += OnViewerDisconnected;
         _server.ServerError += OnServerError;
+        _tunnel.StateChanged += OnTunnelStateChanged;
 
-        Unloaded += (_, _) => _server.Stop();
+        Unloaded += (_, _) =>
+        {
+            _server.Stop();
+            _tunnel.Stop();
+        };
     }
 
     private static string GenerateRandomPin()
@@ -39,6 +45,7 @@ public partial class HostView : UserControl
     private void BackLink_Click(object sender, MouseButtonEventArgs e)
     {
         _server.Stop();
+        _tunnel.Stop();
         _window.NavigateHome();
     }
 
@@ -66,14 +73,53 @@ public partial class HostView : UserControl
         IpListText.Text = FormatLocalIps();
         SetupCard.Visibility = Visibility.Collapsed;
         RunningCard.Visibility = Visibility.Visible;
+
+        if (TunnelCheckBox.IsChecked == true)
+        {
+            _tunnel.Start(port);
+        }
+        else
+        {
+            TunnelStatusText.Visibility = Visibility.Collapsed;
+        }
     }
 
     private void StopButton_Click(object sender, RoutedEventArgs e)
     {
         _server.Stop();
+        _tunnel.Stop();
+        TunnelStatusText.Visibility = Visibility.Collapsed;
         RunningCard.Visibility = Visibility.Collapsed;
         SetupCard.Visibility = Visibility.Visible;
         SetSetupStatus(string.Empty, isError: false);
+    }
+
+    private void OnTunnelStateChanged(TunnelState state)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            switch (state.Status)
+            {
+                case TunnelStatus.Starting:
+                    TunnelStatusText.Text = "Internet tunnel ochilmoqda...";
+                    TunnelStatusText.Foreground = (Brush)FindResource("SubtitleBrush");
+                    TunnelStatusText.Visibility = Visibility.Visible;
+                    break;
+                case TunnelStatus.Running:
+                    TunnelStatusText.Text = $"Internet manzili: {state.Url}";
+                    TunnelStatusText.Foreground = (Brush)FindResource("OkBrush");
+                    TunnelStatusText.Visibility = Visibility.Visible;
+                    break;
+                case TunnelStatus.Failed:
+                    TunnelStatusText.Text = $"Internet tunnel xatosi: {state.Error}";
+                    TunnelStatusText.Foreground = (Brush)FindResource("ErrBrush");
+                    TunnelStatusText.Visibility = Visibility.Visible;
+                    break;
+                default:
+                    TunnelStatusText.Visibility = Visibility.Collapsed;
+                    break;
+            }
+        });
     }
 
     private void OnViewerConnected()

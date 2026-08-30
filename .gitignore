@@ -6,7 +6,9 @@ out/
 # macos/ (Swift Package Manager)
 .build/
 build/
+Packaging/.cache/
 
 # windows/ (.NET)
 bin/
 obj/
+windows/LiteDesk/Tools/

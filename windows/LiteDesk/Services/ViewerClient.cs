@@ -33,16 +33,26 @@ public sealed class ViewerClient
 
     public bool IsConnected => _socket?.State == WebSocketState.Open;
 
-    public async Task<(bool Success, string? Error, int Width, int Height)> ConnectAsync(string ip, int port, string password)
+    // `port: null` (only meaningful together with `useTls: true`) builds a
+    // URL with no explicit port — used for a Cloudflare Tunnel address
+    // (Cloudflare terminates TLS at its edge on the implicit 443), where
+    // `host` is a hostname like "xxxx.trycloudflare.com" rather than a LAN
+    // IP. Existing LAN callers (int port, useTls defaulted to false) are
+    // unaffected — int implicitly converts to int?.
+    public async Task<(bool Success, string? Error, int Width, int Height)> ConnectAsync(
+        string host, int? port, string password, bool useTls = false)
     {
         Disconnect();
 
         var socket = new ClientWebSocket();
         var cts = new CancellationTokenSource();
 
+        string scheme = useTls ? "wss" : "ws";
+        string authority = port.HasValue ? $"{host}:{port.Value}" : host;
+
         try
         {
-            await socket.ConnectAsync(new Uri($"ws://{ip}:{port}/"), cts.Token).ConfigureAwait(false);
+            await socket.ConnectAsync(new Uri($"{scheme}://{authority}/"), cts.Token).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

@@ -9,14 +9,23 @@ final class HostSession: ObservableObject {
     @Published var errorMessage: String?
     @Published var localIPs: [String] = []
     @Published var pin: String = ""
+    @Published var port: UInt16 = 0
     @Published var permissions = PermissionsChecker.currentStatus()
+    @Published var tunnelState: CloudflaredTunnelManager.TunnelState = .idle
 
     private let server = WebSocketServer()
     private let capture = ScreenCapture()
     private let mouseInjector = MouseInjector()
     private let keyInjector = KeyInjector()
+    private let tunnelManager = CloudflaredTunnelManager()
+    private var cancellables = Set<AnyCancellable>()
 
     init() {
+        tunnelManager.$state
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] state in self?.tunnelState = state }
+            .store(in: &cancellables)
+
         server.onViewerConnected = { [weak self] in
             DispatchQueue.main.async { self?.viewerConnected = true }
             self?.capture.start()
@@ -60,9 +69,10 @@ final class HostSession: ObservableObject {
         permissions = PermissionsChecker.currentStatus()
     }
 
-    func start(port: UInt16, password: String) {
+    func start(port: UInt16, password: String, useTunnel: Bool) {
         errorMessage = nil
         pin = password
+        self.port = port
 
         // Proactively request whatever's missing (rather than only showing a
         // banner) — first Start click triggers the system prompts.
@@ -78,6 +88,9 @@ final class HostSession: ObservableObject {
             try server.start(port: port, password: password)
             isRunning = true
             localIPs = LocalNetworkInfo.ipv4Addresses()
+            if useTunnel {
+                tunnelManager.start(port: port)
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -86,6 +99,7 @@ final class HostSession: ObservableObject {
     func stop() {
         capture.stop()
         server.stop()
+        tunnelManager.stop()
         isRunning = false
         viewerConnected = false
     }

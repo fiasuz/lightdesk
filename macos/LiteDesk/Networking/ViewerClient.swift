@@ -16,11 +16,18 @@ final class ViewerClient {
     var onFrame: ((Data) -> Void)?
     var onDisconnected: (() -> Void)?
 
-    func connect(ip: String, port: Int, password: String) {
+    /// - Parameters:
+    ///   - port: explicit port for a LAN connection (`ws://ip:port/`). Pass
+    ///     `nil` for an internet/tunnel connection, where the scheme's
+    ///     default port (443 for `wss`) applies and no port is embedded in
+    ///     the URL — matches how a Cloudflare Tunnel hostname is reached.
+    ///   - useTLS: `true` selects `wss://` (Cloudflare Tunnel terminates TLS
+    ///     at its edge), `false` keeps the existing plain `ws://` LAN path.
+    func connect(ip: String, port: Int? = nil, useTLS: Bool = false, password: String) {
         let session = URLSession(configuration: .default)
         self.session = session
 
-        guard let url = URL(string: "ws://\(ip):\(port)/") else {
+        guard let url = Self.buildURL(ip: ip, port: port, useTLS: useTLS) else {
             onAuthResult?(.failure("Noto'g'ri manzil"))
             return
         }
@@ -42,6 +49,14 @@ final class ViewerClient {
     func sendMouseEvent<T: Encodable>(_ message: T) {
         guard let data = try? JSONEncoder().encode(message), let text = String(data: data, encoding: .utf8) else { return }
         task?.send(.string(text)) { _ in }
+    }
+
+    /// Pure URL-building logic, split out so it's unit-testable without
+    /// spinning up a real URLSession/socket.
+    static func buildURL(ip: String, port: Int?, useTLS: Bool) -> URL? {
+        let scheme = useTLS ? "wss" : "ws"
+        let host = port.map { "\(ip):\($0)" } ?? ip
+        return URL(string: "\(scheme)://\(host)/")
     }
 
     private func sendAuth(password: String) {

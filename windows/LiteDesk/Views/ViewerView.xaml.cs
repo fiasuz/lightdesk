@@ -47,22 +47,74 @@ public partial class ViewerView : UserControl
         _window.NavigateHome();
     }
 
+    private void ConnectMode_Changed(object sender, RoutedEventArgs e)
+    {
+        // Guard against InitializeComponent firing Checked before the panel
+        // fields further down in the XAML have been assigned yet.
+        if (LanFieldsPanel is null || InternetFieldsPanel is null) return;
+
+        bool isLan = LanModeRadio.IsChecked == true;
+        LanFieldsPanel.Visibility = isLan ? Visibility.Visible : Visibility.Collapsed;
+        InternetFieldsPanel.Visibility = isLan ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    // Accepts either a pasted full URL (https://xxxx.trycloudflare.com) or a
+    // bare hostname (xxxx.trycloudflare.com) and returns just the host part.
+    private static string NormalizeTunnelAddress(string input)
+    {
+        if (input.Contains("://", StringComparison.Ordinal) &&
+            Uri.TryCreate(input, UriKind.Absolute, out Uri? parsed))
+        {
+            return parsed.Host;
+        }
+        return input.TrimEnd('/');
+    }
+
     private async void ConnectButton_Click(object sender, RoutedEventArgs e)
     {
-        string ip = IpBox.Text.Trim();
         string password = PasswordBox.Text.Trim();
-        if (!int.TryParse(PortBox.Text, out int port)) port = 5900;
-
-        if (string.IsNullOrEmpty(ip) || string.IsNullOrEmpty(password))
+        if (string.IsNullOrEmpty(password))
         {
-            SetStatus("IP va parolni kiriting", isError: true);
+            SetStatus("Parolni kiriting", isError: true);
             return;
+        }
+
+        bool useTunnel = InternetModeRadio.IsChecked == true;
+        string host;
+        int? port;
+        bool useTls;
+        string displayAddress;
+
+        if (useTunnel)
+        {
+            host = NormalizeTunnelAddress(TunnelAddressBox.Text.Trim());
+            if (string.IsNullOrEmpty(host))
+            {
+                SetStatus("Tunnel manzilini kiriting", isError: true);
+                return;
+            }
+            port = null;
+            useTls = true;
+            displayAddress = host;
+        }
+        else
+        {
+            host = IpBox.Text.Trim();
+            if (string.IsNullOrEmpty(host))
+            {
+                SetStatus("IP manzilni kiriting", isError: true);
+                return;
+            }
+            if (!int.TryParse(PortBox.Text, out int parsedPort)) parsedPort = 5900;
+            port = parsedPort;
+            useTls = false;
+            displayAddress = $"{host}:{parsedPort}";
         }
 
         SetStatus("Ulanmoqda...", isError: false);
         ConnectButton.IsEnabled = false;
 
-        var (success, error, _, _) = await _client.ConnectAsync(ip, port, password);
+        var (success, error, _, _) = await _client.ConnectAsync(host, port, password, useTls);
         ConnectButton.IsEnabled = true;
 
         if (!success)
@@ -71,7 +123,7 @@ public partial class ViewerView : UserControl
             return;
         }
 
-        RemoteInfoText.Text = $"{ip}:{port} bilan ulanildi";
+        RemoteInfoText.Text = $"{displayAddress} bilan ulanildi";
         RemoteImage.Source = null;
         SetupScreen.Visibility = Visibility.Collapsed;
         RemoteScreen.Visibility = Visibility.Visible;

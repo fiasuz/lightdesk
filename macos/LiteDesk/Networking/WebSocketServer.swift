@@ -37,6 +37,19 @@ final class WebSocketServer {
     private var password: String = ""
     private let queue = DispatchQueue(label: "com.litedesk.wsserver")
 
+    // Internet-facing exposure (via a Cloudflare Tunnel) makes the PIN
+    // reachable from anyone, not just the LAN — track failed attempts per
+    // remote IP and temporarily lock out repeat offenders.
+    private struct AuthAttemptState {
+        var failureCount = 0
+        var windowStart = Date()
+        var blockedUntil: Date?
+    }
+    private var authAttempts: [String: AuthAttemptState] = [:]
+    private let maxAuthFailures = 5
+    private let authFailureWindow: TimeInterval = 300
+    private let authBlockDuration: TimeInterval = 300
+
     var onViewerConnected: (() -> Void)?
     var onViewerDisconnected: (() -> Void)?
     var onMouseMessage: ((MouseMessage) -> Void)?
@@ -95,6 +108,10 @@ final class WebSocketServer {
     // MARK: - Connection lifecycle
 
     private func handleNewConnection(_ conn: NWConnection) {
+        if let ip = Self.remoteIP(for: conn), isBlocked(ip: ip) {
+            conn.cancel()
+            return
+        }
         let client = ClientConnection(connection: conn)
         pendingConnections[ObjectIdentifier(conn)] = client
         conn.stateUpdateHandler = { [weak self, weak client] state in
@@ -287,16 +304,27 @@ final class WebSocketServer {
         }
         guard let auth = try? JSONDecoder().decode(AuthMessage.self, from: payload) else { return }
 
+        let ip = Self.remoteIP(for: client.connection)
+
         guard auth.password == password else {
-            let fail = AuthFailMessage()
-            if let data = try? JSONEncoder().encode(fail) {
-                let frame = WebSocketFrameEncoder.encodeText(data)
-                client.connection.send(content: frame, completion: .contentProcessed { [weak client] _ in
-                    client?.connection.cancel()
-                })
+            if let ip { recordAuthFailure(ip: ip) }
+            // Small artificial delay to slow down naive brute-force loops
+            // now that this port may be reachable from the whole internet
+            // (via a Cloudflare Tunnel), not just the LAN.
+            queue.asyncAfter(deadline: .now() + 0.5) { [weak client] in
+                guard let client else { return }
+                let fail = AuthFailMessage()
+                if let data = try? JSONEncoder().encode(fail) {
+                    let frame = WebSocketFrameEncoder.encodeText(data)
+                    client.connection.send(content: frame, completion: .contentProcessed { _ in
+                        client.connection.cancel()
+                    })
+                }
             }
             return
         }
+
+        if let ip { authAttempts.removeValue(forKey: ip) }
 
         client.authenticated = true
         viewer = client
@@ -309,5 +337,33 @@ final class WebSocketServer {
             client.connection.send(content: frame, completion: .contentProcessed { _ in })
         }
         onViewerConnected?()
+    }
+
+    // MARK: - Brute-force protection
+
+    private static func remoteIP(for connection: NWConnection) -> String? {
+        guard case let .hostPort(host, _) = connection.endpoint else { return nil }
+        return "\(host)"
+    }
+
+    private func isBlocked(ip: String) -> Bool {
+        guard let state = authAttempts[ip], let blockedUntil = state.blockedUntil else { return false }
+        if Date() < blockedUntil {
+            return true
+        }
+        authAttempts.removeValue(forKey: ip)
+        return false
+    }
+
+    private func recordAuthFailure(ip: String) {
+        var state = authAttempts[ip] ?? AuthAttemptState()
+        if Date().timeIntervalSince(state.windowStart) > authFailureWindow {
+            state = AuthAttemptState()
+        }
+        state.failureCount += 1
+        if state.failureCount >= maxAuthFailures {
+            state.blockedUntil = Date().addingTimeInterval(authBlockDuration)
+        }
+        authAttempts[ip] = state
     }
 }
