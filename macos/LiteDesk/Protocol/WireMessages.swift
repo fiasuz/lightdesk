@@ -88,3 +88,42 @@ enum MouseMessage {
         }
     }
 }
+
+// Keyboard messages. `code` is a layout-independent physical-key identifier
+// using the W3C UIEvents KeyboardEvent.code vocabulary (e.g. "KeyA",
+// "ShiftLeft", "ArrowLeft") so a macOS viewer can drive a Windows host and
+// vice versa without either side knowing the other's native keycode space —
+// see KeyCodeMap.swift for the translation table.
+struct KeyDownMessage: Codable {
+    let type = "key-down"
+    let code: String
+
+    enum CodingKeys: String, CodingKey { case type, code }
+}
+
+struct KeyUpMessage: Codable {
+    let type = "key-up"
+    let code: String
+
+    enum CodingKeys: String, CodingKey { case type, code }
+}
+
+enum KeyMessage {
+    case down(code: String)
+    case up(code: String)
+
+    static func parse(_ data: Data) -> KeyMessage? {
+        guard let envelope = try? JSONDecoder().decode(TypeEnvelope.self, from: data) else { return nil }
+        let decoder = JSONDecoder()
+        switch envelope.type {
+        case "key-down":
+            guard let m = try? decoder.decode(KeyDownMessage.self, from: data) else { return nil }
+            return .down(code: m.code)
+        case "key-up":
+            guard let m = try? decoder.decode(KeyUpMessage.self, from: data) else { return nil }
+            return .up(code: m.code)
+        default:
+            return nil
+        }
+    }
+}

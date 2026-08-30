@@ -40,6 +40,7 @@ final class WebSocketServer {
     var onViewerConnected: (() -> Void)?
     var onViewerDisconnected: (() -> Void)?
     var onMouseMessage: ((MouseMessage) -> Void)?
+    var onKeyMessage: ((KeyMessage) -> Void)?
     var onError: ((String) -> Void)?
 
     /// Called to obtain the width/height reported in auth-ok. Point-space on macOS
@@ -253,6 +254,8 @@ final class WebSocketServer {
         WebSocketServer.debugLog("RECV \(String(data: payload, encoding: .utf8) ?? "<non-utf8>")")
         if let message = MouseMessage.parse(payload) {
             onMouseMessage?(message)
+        } else if let message = KeyMessage.parse(payload) {
+            onKeyMessage?(message)
         } else {
             WebSocketServer.debugLog("PARSE FAILED for above payload")
         }

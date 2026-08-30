@@ -24,6 +24,8 @@ public static class WireMessageParser
                 "mouse-down" => JsonSerializer.Deserialize<MouseDownMessage>(json),
                 "mouse-up" => JsonSerializer.Deserialize<MouseUpMessage>(json),
                 "mouse-scroll" => JsonSerializer.Deserialize<MouseScrollMessage>(json),
+                "key-down" => JsonSerializer.Deserialize<KeyDownMessage>(json),
+                "key-up" => JsonSerializer.Deserialize<KeyUpMessage>(json),
                 _ => null,
             };
         }

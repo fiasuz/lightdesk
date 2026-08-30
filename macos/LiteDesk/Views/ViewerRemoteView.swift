@@ -70,5 +70,13 @@ struct RemoteSurfaceRepresentable: NSViewRepresentable {
         func remoteSurfaceViewDidScroll(dx: Double, dy: Double) {
             session.sendMouseScroll(dx: dx, dy: dy)
         }
+
+        func remoteSurfaceViewDidPressKey(code: String) {
+            session.sendKeyDown(code: code)
+        }
+
+        func remoteSurfaceViewDidReleaseKey(code: String) {
+            session.sendKeyUp(code: code)
+        }
     }
 }

@@ -14,6 +14,7 @@ final class HostSession: ObservableObject {
     private let server = WebSocketServer()
     private let capture = ScreenCapture()
     private let mouseInjector = MouseInjector()
+    private let keyInjector = KeyInjector()
 
     init() {
         server.onViewerConnected = { [weak self] in
@@ -30,6 +31,9 @@ final class HostSession: ObservableObject {
         server.onMouseMessage = { [weak self] message in
             guard let self else { return }
             self.mouseInjector.handle(message, screenSize: Self.mainDisplaySize())
+        }
+        server.onKeyMessage = { [weak self] message in
+            self?.keyInjector.handle(message)
         }
         // CGDisplayBounds(CGMainDisplayID()), not NSScreen.main: this callback
         // (and screenSizeProvider below) fire on WebSocketServer's background

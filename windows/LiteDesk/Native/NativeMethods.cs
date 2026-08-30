@@ -71,15 +71,18 @@ internal static class NativeMethods
     }
 
     // Native INPUT is a tagged union (DWORD type + union { MOUSEINPUT;
-    // KEYBDINPUT; HARDWAREINPUT; }). Only the mouse variant is used here.
-    // `mi` is pinned at FieldOffset(8) rather than relying on implicit
-    // Sequential-layout padding: on x64 the union must start 8-byte-aligned
-    // (it contains an IntPtr field), so the native compiler inserts 4 bytes
-    // of padding after the 4-byte `type` field before the union begins —
-    // offset 8 reproduces that exactly. Total size is pinned to 40 bytes
+    // KEYBDINPUT; HARDWAREINPUT; }). `mi` and `ki` are pinned at
+    // FieldOffset(8) rather than relying on implicit Sequential-layout
+    // padding: on x64 the union must start 8-byte-aligned (it contains an
+    // IntPtr field), so the native compiler inserts 4 bytes of padding
+    // after the 4-byte `type` field before the union begins — offset 8
+    // reproduces that exactly. Total size is pinned to 40 bytes
     // (8 + sizeof(MOUSEINPUT), where MOUSEINPUT itself is 32 bytes on x64:
     // 5 x 4-byte fields + 4 bytes padding to 8-byte-align the trailing
-    // IntPtr), matching native `sizeof(INPUT)` on x64.
+    // IntPtr), matching native `sizeof(INPUT)` on x64. KEYBDINPUT is only
+    // 24 bytes (2 x 2-byte + 2 x 4-byte fields + 4 bytes padding + IntPtr),
+    // which fits comfortably inside that same 40-byte footprint at the
+    // same offset 8.
     [StructLayout(LayoutKind.Explicit, Size = 40)]
     internal struct INPUT
     {
@@ -88,9 +91,13 @@ internal static class NativeMethods
 
         [FieldOffset(8)]
         public MOUSEINPUT mi;
+
+        [FieldOffset(8)]
+        public KEYBDINPUT ki;
     }
 
     internal const int INPUT_MOUSE = 0;
+    internal const int INPUT_KEYBOARD = 1;
 
     internal const uint MOUSEEVENTF_MOVE = 0x0001;
     internal const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
@@ -108,4 +115,20 @@ internal static class NativeMethods
 
     [DllImport("user32.dll", SetLastError = true)]
     internal static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+
+    // ---------------------------------------------------------------
+    // user32: keyboard input injection (Services/KeyInjector.cs)
+    // ---------------------------------------------------------------
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct KEYBDINPUT
+    {
+        public ushort wVk;
+        public ushort wScan;
+        public uint dwFlags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
+    internal const uint KEYEVENTF_KEYUP = 0x0002;
 }

@@ -6,6 +6,8 @@ protocol RemoteSurfaceViewDelegate: AnyObject {
     func remoteSurfaceViewDidPressMouse(x: Double, y: Double, button: String)
     func remoteSurfaceViewDidReleaseMouse(button: String)
     func remoteSurfaceViewDidScroll(dx: Double, dy: Double)
+    func remoteSurfaceViewDidPressKey(code: String)
+    func remoteSurfaceViewDidReleaseKey(code: String)
 }
 
 /// Layer-backed NSView rendering incoming JPEG frames directly onto layer.contents
@@ -127,5 +129,35 @@ final class RemoteSurfaceView: NSView {
 
     override func scrollWheel(with event: NSEvent) {
         delegate?.remoteSurfaceViewDidScroll(dx: Double(event.scrollingDeltaX), dy: Double(event.scrollingDeltaY))
+    }
+
+    // MARK: - Keyboard
+
+    override func keyDown(with event: NSEvent) {
+        guard let code = KeyCodeMap.domCode(forKeyCode: event.keyCode) else { return }
+        delegate?.remoteSurfaceViewDidPressKey(code: code)
+    }
+
+    override func keyUp(with event: NSEvent) {
+        guard let code = KeyCodeMap.domCode(forKeyCode: event.keyCode) else { return }
+        delegate?.remoteSurfaceViewDidReleaseKey(code: code)
+    }
+
+    // Modifier-only keys (Shift/Control/Option/Command/CapsLock) never generate
+    // keyDown/keyUp — only flagsChanged, whose modifierFlags is a bitmask that
+    // doesn't by itself say press-vs-release for a given physical key. Track
+    // which modifier keyCodes are currently down and toggle off that, not the
+    // bitmask, since flagsChanged.keyCode already identifies the specific
+    // left/right key that changed.
+    private var pressedModifierKeyCodes: Set<UInt16> = []
+
+    override func flagsChanged(with event: NSEvent) {
+        guard let code = KeyCodeMap.domCode(forKeyCode: event.keyCode) else { return }
+        if pressedModifierKeyCodes.remove(event.keyCode) != nil {
+            delegate?.remoteSurfaceViewDidReleaseKey(code: code)
+        } else {
+            pressedModifierKeyCodes.insert(event.keyCode)
+            delegate?.remoteSurfaceViewDidPressKey(code: code)
+        }
     }
 }

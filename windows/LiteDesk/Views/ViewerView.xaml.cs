@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using LiteDesk.Native;
 using LiteDesk.Protocol;
 using LiteDesk.Services;
 
@@ -74,6 +75,7 @@ public partial class ViewerView : UserControl
         RemoteImage.Source = null;
         SetupScreen.Visibility = Visibility.Collapsed;
         RemoteScreen.Visibility = Visibility.Visible;
+        RemoteImage.Focus();
     }
 
     private void DisconnectButton_Click(object sender, RoutedEventArgs e)
@@ -153,6 +155,10 @@ public partial class ViewerView : UserControl
 
     private void RemoteImage_MouseDown(object sender, MouseButtonEventArgs e)
     {
+        // Clicking the remote surface is also how keyboard focus lands back
+        // on it (e.g. after the user was typing in the IP/password fields on
+        // SetupScreen, or clicked some other window and came back).
+        RemoteImage.Focus();
         if (!TryGetNormalizedPosition(e, out double x, out double y)) return;
         _ = _client.SendMouseEventAsync(new MouseDownMessage { X = x, Y = y, Button = ButtonName(e.ChangedButton) });
     }
@@ -183,6 +189,36 @@ public partial class ViewerView : UserControl
         double dy = -e.Delta;
         _ = _client.SendMouseEventAsync(new MouseScrollMessage { Dx = 0, Dy = dy });
         e.Handled = true;
+    }
+
+    // Held-down modifier/navigation keys (Alt, Tab, arrows, F10, ...) surface
+    // through e.Key == Key.System or would otherwise be swallowed by WPF's
+    // own accelerator/focus-navigation handling before a plain KeyDown
+    // handler ever sees them — using Preview* and marking e.Handled = true
+    // is what keeps them from also acting locally (menu access keys, tab
+    // focus movement) while forwarding them to the remote host.
+    private void RemoteImage_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (!TrySendKeyEvent(e, isDown: true)) return;
+        e.Handled = true;
+    }
+
+    private void RemoteImage_PreviewKeyUp(object sender, KeyEventArgs e)
+    {
+        if (!TrySendKeyEvent(e, isDown: false)) return;
+        e.Handled = true;
+    }
+
+    private bool TrySendKeyEvent(KeyEventArgs e, bool isDown)
+    {
+        Key key = e.Key == Key.System ? e.SystemKey : e.Key;
+        int virtualKey = KeyInterop.VirtualKeyFromKey(key);
+        string? code = KeyCodeMap.DomCode(virtualKey);
+        if (code is null) return false;
+
+        WireMessage message = isDown ? new KeyDownMessage { Code = code } : new KeyUpMessage { Code = code };
+        _ = _client.SendMouseEventAsync(message);
+        return true;
     }
 
     private void RemoteImage_ContextMenuOpening(object sender, ContextMenuEventArgs e)

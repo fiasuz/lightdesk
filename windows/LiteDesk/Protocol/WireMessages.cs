@@ -81,3 +81,24 @@ public sealed class MouseScrollMessage : WireMessage
     [JsonPropertyName("dy")]
     public double Dy { get; set; }
 }
+
+// `Code` is a layout-independent physical-key identifier using the W3C
+// UIEvents KeyboardEvent.code vocabulary (e.g. "KeyA", "ShiftLeft",
+// "ArrowLeft") so a Windows viewer can drive a macOS host and vice versa
+// without either side knowing the other's native keycode space — see
+// Native/KeyCodeMap.cs for the translation table.
+public sealed class KeyDownMessage : WireMessage
+{
+    public KeyDownMessage() { Type = "key-down"; }
+
+    [JsonPropertyName("code")]
+    public string Code { get; set; } = "";
+}
+
+public sealed class KeyUpMessage : WireMessage
+{
+    public KeyUpMessage() { Type = "key-up"; }
+
+    [JsonPropertyName("code")]
+    public string Code { get; set; } = "";
+}

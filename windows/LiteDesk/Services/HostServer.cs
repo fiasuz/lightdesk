@@ -23,6 +23,7 @@ public sealed class HostServer
     private readonly object _viewerLock = new();
     private readonly ScreenCapture _screenCapture = new();
     private readonly MouseInjector _mouseInjector = new();
+    private readonly KeyInjector _keyInjector = new();
 
     private TcpListener? _listener;
     private CancellationTokenSource? _cts;
@@ -55,6 +56,7 @@ public sealed class HostServer
         _mouseInjector.FrameWidth = width;
         _mouseInjector.FrameHeight = height;
         _mouseInjector.Start();
+        _keyInjector.Start();
         _screenCapture.Start();
     }
 
@@ -62,6 +64,7 @@ public sealed class HostServer
     {
         _screenCapture.Stop();
         _mouseInjector.Stop();
+        _keyInjector.Stop();
     }
 
     public (bool Success, string? Error) Start(int port, string password)
@@ -95,6 +98,7 @@ public sealed class HostServer
 
         _screenCapture.Stop();
         _mouseInjector.Stop();
+        _keyInjector.Stop();
 
         lock (_viewerLock)
         {
@@ -245,6 +249,10 @@ public sealed class HostServer
             {
                 _mouseInjector.Enqueue(msg);
                 MouseMessageReceived?.Invoke(msg);
+            }
+            else if (msg is KeyDownMessage or KeyUpMessage)
+            {
+                _keyInjector.Enqueue(msg);
             }
         }
     }

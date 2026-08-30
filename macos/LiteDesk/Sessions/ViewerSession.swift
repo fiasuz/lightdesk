@@ -59,4 +59,12 @@ final class ViewerSession: ObservableObject {
     func sendMouseScroll(dx: Double, dy: Double) {
         sendMouseEvent(MouseScrollMessage(dx: dx, dy: dy))
     }
+
+    func sendKeyDown(code: String) {
+        sendMouseEvent(KeyDownMessage(code: code))
+    }
+
+    func sendKeyUp(code: String) {
+        sendMouseEvent(KeyUpMessage(code: code))
+    }
 }

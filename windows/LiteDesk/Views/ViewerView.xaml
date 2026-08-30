@@ -41,11 +41,14 @@
                 hidden while hovering the remote surface.
             -->
             <Image x:Name="RemoteImage" Stretch="Uniform" Cursor="None"
+                   Focusable="True" FocusVisualStyle="{x:Null}"
                    MouseMove="RemoteImage_MouseMove"
                    MouseDown="RemoteImage_MouseDown"
                    MouseUp="RemoteImage_MouseUp"
                    MouseWheel="RemoteImage_MouseWheel"
-                   ContextMenuOpening="RemoteImage_ContextMenuOpening"/>
+                   ContextMenuOpening="RemoteImage_ContextMenuOpening"
+                   PreviewKeyDown="RemoteImage_PreviewKeyDown"
+                   PreviewKeyUp="RemoteImage_PreviewKeyUp"/>
 
             <Border Background="{StaticResource TopbarBrush}" VerticalAlignment="Top" Height="40">
                 <DockPanel LastChildFill="False" Margin="14,0">
