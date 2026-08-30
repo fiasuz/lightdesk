@@ -1,5 +1,7 @@
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Channels;
+using System.Threading.Tasks;
 using LiteDesk.Native;
 using LiteDesk.Protocol;
 
