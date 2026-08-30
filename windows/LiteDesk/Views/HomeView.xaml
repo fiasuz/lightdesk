@@ -1,0 +1,34 @@
+<UserControl x:Class="LiteDesk.Views.HomeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Background="{StaticResource BgBrush}">
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+            <TextBlock Text="LiteDesk" FontSize="22" Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center"/>
+            <TextBlock Text="Lokal tarmoq (LAN) orqali masofadan boshqarish"
+                       FontSize="13" Foreground="{StaticResource SubtitleBrush}"
+                       Margin="0,4,0,32" HorizontalAlignment="Center"/>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <Border x:Name="HostModeButton" Style="{StaticResource ModeCard}" MouseLeftButtonUp="HostModeButton_Click">
+                    <StackPanel>
+                        <TextBlock Text="&#128421;&#65039;" FontSize="30" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                        <TextBlock Text="Bu kompyuterni ulashish" TextAlignment="Center"
+                                   Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
+                        <TextBlock Text="(Host bo'lish)" TextAlignment="Center"
+                                   Foreground="{StaticResource SubtitleBrush}" FontSize="12" Margin="0,6,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="ViewerModeButton" Style="{StaticResource ModeCard}" Margin="16,0,0,0" MouseLeftButtonUp="ViewerModeButton_Click">
+                    <StackPanel>
+                        <TextBlock Text="&#128279;" FontSize="30" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                        <TextBlock Text="Boshqa kompyuterga ulanish" TextAlignment="Center"
+                                   Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
+                        <TextBlock Text="(Viewer)" TextAlignment="Center"
+                                   Foreground="{StaticResource SubtitleBrush}" FontSize="12" Margin="0,6,0,0"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</UserControl>

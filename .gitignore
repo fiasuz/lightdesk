@@ -2,3 +2,11 @@ node_modules/
 dist/
 out/
 .DS_Store
+
+# macos/ (Swift Package Manager)
+.build/
+build/
+
+# windows/ (.NET)
+bin/
+obj/

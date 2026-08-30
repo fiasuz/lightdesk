@@ -1,0 +1,10 @@
+<Window x:Class="LiteDesk.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="LiteDesk" Height="700" Width="1000" MinHeight="500" MinWidth="700"
+        Background="{StaticResource BgBrush}"
+        WindowStartupLocation="CenterScreen">
+    <Grid>
+        <ContentControl x:Name="ContentHost"/>
+    </Grid>
+</Window>

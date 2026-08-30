@@ -1,0 +1,53 @@
+<UserControl x:Class="LiteDesk.Views.HostView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Background="{StaticResource BgBrush}">
+        <TextBlock Text="&#8592; Orqaga" Foreground="{StaticResource SubtitleBrush}"
+                   HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16"
+                   Cursor="Hand" MouseLeftButtonUp="BackLink_Click"/>
+
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="380">
+            <TextBlock Text="Bu kompyuterni ulashish" FontSize="22" Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center"/>
+            <TextBlock Text="Boshqa kompyuter shu manzil va parol orqali ulanadi"
+                       FontSize="13" Foreground="{StaticResource SubtitleBrush}"
+                       Margin="0,4,0,32" TextAlignment="Center" TextWrapping="Wrap"/>
+
+            <Border x:Name="SetupCard" Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="Ekran" Style="{StaticResource CardLabel}" Margin="0,0,0,6"/>
+                    <!--
+                        V1 shares only the primary monitor (see plan's Deviations
+                        note) — no source picker, unlike the Electron app's
+                        desktopCapturer-based dropdown.
+                    -->
+                    <TextBlock Text="Asosiy monitor" Foreground="{StaticResource TextBrush}" FontSize="14"/>
+
+                    <TextBlock Text="Port" Style="{StaticResource CardLabel}"/>
+                    <TextBox x:Name="PortBox" Text="5900"/>
+
+                    <TextBlock Text="Parol (PIN)" Style="{StaticResource CardLabel}"/>
+                    <TextBox x:Name="PasswordBox"/>
+
+                    <Button x:Name="StartButton" Content="Ulashishni boshlash" Style="{StaticResource PrimaryButton}" Click="StartButton_Click"/>
+                    <TextBlock x:Name="SetupStatusText" Margin="0,14,0,0" FontSize="13" TextWrapping="Wrap"
+                               Foreground="{StaticResource SubtitleBrush}"/>
+                </StackPanel>
+            </Border>
+
+            <Border x:Name="RunningCard" Style="{StaticResource Card}" Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock x:Name="IpListText" Foreground="{StaticResource SubtitleBrush}" FontSize="13" TextWrapping="Wrap"/>
+
+                    <TextBlock Text="PIN" Style="{StaticResource CardLabel}"/>
+                    <TextBlock x:Name="PinDisplayText" FontSize="30" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"
+                               HorizontalAlignment="Center" Margin="0,0,0,10"/>
+
+                    <TextBlock x:Name="ConnStatusText" Text="Ulanish kutilmoqda..." FontSize="13"
+                               Foreground="{StaticResource TextBrush}"/>
+
+                    <Button x:Name="StopButton" Content="To'xtatish" Style="{StaticResource SecondaryButton}" Click="StopButton_Click"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Grid>
+</UserControl>
