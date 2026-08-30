@@ -119,8 +119,7 @@ public partial class ViewerView : UserControl
     {
         try
         {
-            string path = System.IO.Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "litedesk-viewer-debug.log");
+            string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "litedesk-viewer-debug.log");
             System.IO.File.AppendAllText(path, $"{DateTime.Now:HH:mm:ss.fff} VIEW {line}{Environment.NewLine}");
         }
         catch { /* diagnostic only */ }

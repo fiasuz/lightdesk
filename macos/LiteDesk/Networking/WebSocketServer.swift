@@ -68,6 +68,7 @@ final class WebSocketServer {
         }
         listener.start(queue: queue)
         self.listener = listener
+        WebSocketServer.debugLog("SERVER START on port \(port)")
     }
 
     func stop() {
@@ -259,7 +260,11 @@ final class WebSocketServer {
 
     // TEMP DIAGNOSTIC — remove once the live-move bug is root-caused.
     static func debugLog(_ line: String) {
-        let path = NSHomeDirectory() + "/Desktop/litedesk-host-debug.log"
+        // /tmp, not ~/Desktop: Desktop/Documents/Downloads are TCC-protected
+        // on macOS 10.15+, so a non-sandboxed app writing there without an
+        // explicit user-granted bookmark either prompts or silently fails —
+        // exactly what made the log file never show up.
+        let path = "/tmp/litedesk-host-debug.log"
         let stamp = ISO8601DateFormatter().string(from: Date())
         let entry = "\(stamp) \(line)\n"
         if let data = entry.data(using: .utf8) {

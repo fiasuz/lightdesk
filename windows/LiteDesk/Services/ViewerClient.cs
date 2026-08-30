@@ -71,6 +71,7 @@ public sealed class ViewerClient
             switch (reply)
             {
                 case AuthOkMessage ok:
+                    DebugLog($"CONNECTED width={ok.Width} height={ok.Height}");
                     _ = ReceiveLoopAsync(socket, cts.Token);
                     return (true, null, ok.Width, ok.Height);
                 case AuthFailMessage:
@@ -104,7 +105,10 @@ public sealed class ViewerClient
     {
         try
         {
-            string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "litedesk-viewer-debug.log");
+            // %TEMP%, not Desktop: some Windows setups redirect Desktop to a
+            // synced/locked OneDrive folder, which can silently fail writes;
+            // %TEMP% is always a plain local, writable folder.
+            string path = Path.Combine(Path.GetTempPath(), "litedesk-viewer-debug.log");
             lock (DebugLogLock)
             {
                 File.AppendAllText(path, $"{DateTime.Now:HH:mm:ss.fff} {line}{Environment.NewLine}");
