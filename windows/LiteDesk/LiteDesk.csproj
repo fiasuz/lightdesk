@@ -38,7 +38,15 @@
     <Exec Command="curl.exe -L -o Tools\cloudflared.exe https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
           Condition="!Exists('Tools\cloudflared.exe')"/>
     <ItemGroup>
+      <!--
+        Link flattens the destination to the output/publish root
+        (cloudflared.exe next to LiteDesk.exe) — without it MSBuild copies
+        content items to a path mirroring their source (Tools\cloudflared.exe
+        under OutDir), which CloudflareTunnelService.ResolveCloudflaredPath()
+        does not look in (it only checks AppContext.BaseDirectory directly).
+      -->
       <None Include="Tools\cloudflared.exe" Condition="Exists('Tools\cloudflared.exe')">
+        <Link>cloudflared.exe</Link>
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
       </None>
