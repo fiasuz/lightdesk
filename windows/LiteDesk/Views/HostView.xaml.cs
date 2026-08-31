@@ -1,5 +1,3 @@
-using System.Net.NetworkInformation;
-using System.Net.Sockets;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -13,6 +11,11 @@ namespace LiteDesk.Views;
 // stands up the WebSocket server and shows connection status.
 public partial class HostView : UserControl
 {
+    // Fixed local bind port for the WebSocket server / tunnel forward target
+    // — no longer user-configurable now that LAN connections are gone and
+    // the viewer only ever reaches this over the Cloudflare Tunnel.
+    private const int Port = 5900;
+
     private readonly MainWindow _window;
     private readonly HostServer _server = new();
     private readonly CloudflareTunnelService _tunnel = new();
@@ -23,7 +26,7 @@ public partial class HostView : UserControl
         InitializeComponent();
         _window = window;
 
-        PasswordBox.Text = GenerateRandomPin();
+        PasswordText.Text = GenerateRandomPin();
 
         _server.ViewerConnected += OnViewerConnected;
         _server.ViewerDisconnected += OnViewerDisconnected;
@@ -52,18 +55,11 @@ public partial class HostView : UserControl
 
     private void StartButton_Click(object sender, RoutedEventArgs e)
     {
-        string password = PasswordBox.Text.Trim();
-        if (string.IsNullOrEmpty(password))
-        {
-            SetSetupStatus("Parol kiriting", isError: true);
-            return;
-        }
-
-        if (!int.TryParse(PortBox.Text, out int port)) port = 5900;
+        string password = PasswordText.Text;
 
         SetSetupStatus("Ishga tushirilmoqda...", isError: false);
 
-        (bool success, string? error) = _server.Start(port, password);
+        (bool success, string? error) = _server.Start(Port, password);
         if (!success)
         {
             SetSetupStatus($"Xato: {error}", isError: true);
@@ -71,18 +67,10 @@ public partial class HostView : UserControl
         }
 
         PinDisplayText.Text = password;
-        IpListText.Text = FormatLocalIps();
         SetupCard.Visibility = Visibility.Collapsed;
         RunningCard.Visibility = Visibility.Visible;
 
-        if (TunnelCheckBox.IsChecked == true)
-        {
-            _tunnel.Start(port);
-        }
-        else
-        {
-            TunnelStatusText.Visibility = Visibility.Collapsed;
-        }
+        _tunnel.Start(Port);
     }
 
     private void StopButton_Click(object sender, RoutedEventArgs e)
@@ -180,27 +168,5 @@ public partial class HostView : UserControl
     {
         SetupStatusText.Text = text;
         SetupStatusText.Foreground = (Brush)FindResource(isError ? "ErrBrush" : "SubtitleBrush");
-    }
-
-    // Port of the "get-local-ips" IPC handler in src/main.js.
-    private static string FormatLocalIps()
-    {
-        var ips = new List<string>();
-
-        foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())
-        {
-            if (ni.OperationalStatus != OperationalStatus.Up) continue;
-
-            foreach (UnicastIPAddressInformation addr in ni.GetIPProperties().UnicastAddresses)
-            {
-                if (addr.Address.AddressFamily != AddressFamily.InterNetwork) continue;
-                if (System.Net.IPAddress.IsLoopback(addr.Address)) continue;
-                ips.Add(addr.Address.ToString());
-            }
-        }
-
-        return ips.Count > 0
-            ? string.Join(", ", ips) + " manzillaridan biri"
-            : "IP manzil topilmadi";
     }
 }

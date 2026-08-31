@@ -4,7 +4,7 @@
     <Grid Background="{StaticResource BgBrush}">
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
             <TextBlock Text="LiteDesk" FontSize="22" Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center"/>
-            <TextBlock Text="Lokal tarmoq (LAN) orqali masofadan boshqarish"
+            <TextBlock Text="Internet orqali masofadan boshqarish"
                        FontSize="13" Foreground="{StaticResource SubtitleBrush}"
                        Margin="0,4,0,32" HorizontalAlignment="Center"/>
 

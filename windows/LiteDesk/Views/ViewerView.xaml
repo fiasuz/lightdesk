@@ -10,31 +10,13 @@
 
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="380">
                 <TextBlock Text="Boshqa kompyuterga ulanish" FontSize="22" Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center"/>
-                <TextBlock Text="Ulanmoqchi bo'lgan kompyuterning IP manzili va parolini kiriting"
+                <TextBlock Text="Boshqa kompyuterda ko'rsatilgan ulanish kodini kiriting"
                            FontSize="13" Foreground="{StaticResource SubtitleBrush}"
                            Margin="0,4,0,32" TextAlignment="Center" TextWrapping="Wrap"/>
 
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
-                        <TextBlock Text="Ulanish turi" Style="{StaticResource CardLabel}" Margin="0,0,0,6"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                            <RadioButton x:Name="LanModeRadio" Content="LAN" GroupName="ConnectMode" IsChecked="True"
-                                         Foreground="{StaticResource TextBrush}" FontSize="13" Margin="0,0,20,0"
-                                         Checked="ConnectMode_Changed"/>
-                            <RadioButton x:Name="InternetModeRadio" Content="Internet (Cloudflare Tunnel)" GroupName="ConnectMode"
-                                         Foreground="{StaticResource TextBrush}" FontSize="13"
-                                         Checked="ConnectMode_Changed"/>
-                        </StackPanel>
-
-                        <StackPanel x:Name="LanFieldsPanel">
-                            <TextBlock Text="IP manzil" Style="{StaticResource CardLabel}" Margin="0,0,0,6"/>
-                            <TextBox x:Name="IpBox"/>
-
-                            <TextBlock Text="Port" Style="{StaticResource CardLabel}"/>
-                            <TextBox x:Name="PortBox" Text="5900"/>
-                        </StackPanel>
-
-                        <TextBlock x:Name="PasswordLabel" Text="Parol (PIN)" Style="{StaticResource CardLabel}"/>
+                        <TextBlock Text="Ulanish kodi" Style="{StaticResource CardLabel}"/>
                         <TextBox x:Name="PasswordBox"/>
 
                         <Button x:Name="ConnectButton" Content="Ulanish" Style="{StaticResource PrimaryButton}" Click="ConnectButton_Click"/>

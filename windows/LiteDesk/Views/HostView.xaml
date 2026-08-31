@@ -22,16 +22,11 @@
                     -->
                     <TextBlock Text="Asosiy monitor" Foreground="{StaticResource TextBrush}" FontSize="14"/>
 
-                    <TextBlock Text="Port" Style="{StaticResource CardLabel}"/>
-                    <TextBox x:Name="PortBox" Text="5900"/>
-
                     <TextBlock Text="Parol (PIN)" Style="{StaticResource CardLabel}"/>
-                    <TextBox x:Name="PasswordBox"/>
+                    <TextBlock x:Name="PasswordText" FontSize="20" FontWeight="Bold" FontFamily="Consolas"
+                               Foreground="{StaticResource AccentBrush}" Margin="0,0,0,10"/>
 
-                    <CheckBox x:Name="TunnelCheckBox" Content="Internet orqali ham ulash (Cloudflare Tunnel)"
-                              Foreground="{StaticResource TextBrush}" FontSize="13" Margin="0,16,0,0"/>
-
-                    <Button x:Name="StartButton" Content="Ulashishni boshlash" Style="{StaticResource PrimaryButton}" Click="StartButton_Click"/>
+                    <Button x:Name="StartButton" Content="Ulashishni boshlash" Style="{StaticResource PrimaryButton}" Margin="0,16,0,0" Click="StartButton_Click"/>
                     <TextBlock x:Name="SetupStatusText" Margin="0,14,0,0" FontSize="13" TextWrapping="Wrap"
                                Foreground="{StaticResource SubtitleBrush}"/>
                 </StackPanel>
@@ -39,8 +34,6 @@
 
             <Border x:Name="RunningCard" Style="{StaticResource Card}" Visibility="Collapsed">
                 <StackPanel>
-                    <TextBlock x:Name="IpListText" Foreground="{StaticResource SubtitleBrush}" FontSize="13" TextWrapping="Wrap"/>
-
                     <TextBlock Text="PIN" Style="{StaticResource CardLabel}"/>
                     <TextBlock x:Name="PinDisplayText" FontSize="30" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"
                                HorizontalAlignment="Center" Margin="0,0,0,10"/>
