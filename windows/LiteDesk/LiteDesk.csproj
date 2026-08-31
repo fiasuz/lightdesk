@@ -29,28 +29,30 @@
     (Cloudflare quick tunnel) with no router/port-forwarding and no relay
     server of our own — see Services/CloudflareTunnelService.cs. The binary
     isn't committed to git (keeps the repo binary-free); this target fetches
-    it once per machine into Tools/, which is gitignored. The ItemGroup is
-    declared inside the target (not at top level) so its Exists() condition
-    is (re-)evaluated after the download, not just once at project load.
+    it once per machine into Tools/, which is gitignored.
   -->
   <Target Name="EnsureCloudflared" BeforeTargets="Build;Publish">
     <MakeDir Directories="Tools" Condition="!Exists('Tools')"/>
     <Exec Command="curl.exe -L -o Tools\cloudflared.exe https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
           Condition="!Exists('Tools\cloudflared.exe')"/>
-    <ItemGroup>
-      <!--
-        Link flattens the destination to the output/publish root
-        (cloudflared.exe next to LiteDesk.exe) — without it MSBuild copies
-        content items to a path mirroring their source (Tools\cloudflared.exe
-        under OutDir), which CloudflareTunnelService.ResolveCloudflaredPath()
-        does not look in (it only checks AppContext.BaseDirectory directly).
-      -->
-      <None Include="Tools\cloudflared.exe" Condition="Exists('Tools\cloudflared.exe')">
-        <Link>cloudflared.exe</Link>
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-      </None>
-    </ItemGroup>
+  </Target>
+
+  <!--
+    Copies the already-downloaded cloudflared.exe next to the build/publish
+    output via an explicit Copy task (rather than a None/CopyToOutputDirectory
+    item): that item-based pipeline runs its own AssignTargetPaths/
+    GetCopyToOutputDirectoryItems steps earlier in the Build dependency chain
+    than a BeforeTargets="Build" hook can reliably beat, so an item added
+    dynamically there was silently never copied. AfterTargets guarantees
+    $(TargetDir)/$(PublishDir) are both fully resolved (RID subfolder from
+    RuntimeIdentifier above included) by the time we copy into them.
+  -->
+  <Target Name="CopyCloudflaredToOutput" AfterTargets="Build" Condition="Exists('Tools\cloudflared.exe')">
+    <Copy SourceFiles="Tools\cloudflared.exe" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyCloudflaredToPublish" AfterTargets="Publish" Condition="Exists('Tools\cloudflared.exe')">
+    <Copy SourceFiles="Tools\cloudflared.exe" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
   </Target>
 
 </Project>
