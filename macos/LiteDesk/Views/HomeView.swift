@@ -6,7 +6,7 @@ struct HomeView: View {
     var body: some View {
         VStack(spacing: 24) {
             Text("LiteDesk").font(.system(size: 22, weight: .semibold))
-            Text("Lokal tarmoq (LAN) orqali masofadan boshqarish")
+            Text("Internet orqali masofadan boshqarish")
                 .font(.system(size: 13))
                 .foregroundColor(Palette.subtitle)
             HStack(spacing: 16) {

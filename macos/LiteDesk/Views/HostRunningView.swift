@@ -7,11 +7,6 @@ struct HostRunningView: View {
     var body: some View {
         VStack(spacing: 24) {
             VStack(spacing: 16) {
-                Text(ipListText)
-                    .font(.system(size: 13))
-                    .foregroundColor(Palette.subtitle)
-                    .multilineTextAlignment(.center)
-
                 VStack(spacing: 6) {
                     Text("PIN").font(.system(size: 12)).foregroundColor(Palette.subtitle)
                     Text(session.pin)
@@ -40,13 +35,6 @@ struct HostRunningView: View {
             .frame(width: 380)
         }
         .padding(24)
-    }
-
-    private var ipListText: String {
-        let base = session.localIPs.isEmpty
-            ? "IP manzil topilmadi"
-            : session.localIPs.joined(separator: ", ") + " manzillaridan biri"
-        return base + " (port: \(session.port))"
     }
 
     @ViewBuilder

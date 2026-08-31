@@ -7,9 +7,7 @@ final class HostSession: ObservableObject {
     @Published var isRunning = false
     @Published var viewerConnected = false
     @Published var errorMessage: String?
-    @Published var localIPs: [String] = []
     @Published var pin: String = ""
-    @Published var port: UInt16 = 0
     @Published var permissions = PermissionsChecker.currentStatus()
     @Published var tunnelState: CloudflaredTunnelManager.TunnelState = .idle
 
@@ -69,10 +67,15 @@ final class HostSession: ObservableObject {
         permissions = PermissionsChecker.currentStatus()
     }
 
-    func start(port: UInt16, password: String, useTunnel: Bool) {
+    /// Fixed local bind port for the WebSocket server / tunnel forward target
+    /// — no longer user-configurable now that LAN connections are gone and
+    /// the viewer only ever reaches this over the Cloudflare Tunnel.
+    private static let port: UInt16 = 5900
+
+    func start(password: String) {
+        let port = Self.port
         errorMessage = nil
         pin = password
-        self.port = port
 
         // Proactively request whatever's missing (rather than only showing a
         // banner) — first Start click triggers the system prompts.
@@ -87,10 +90,7 @@ final class HostSession: ObservableObject {
         do {
             try server.start(port: port, password: password)
             isRunning = true
-            localIPs = LocalNetworkInfo.ipv4Addresses()
-            if useTunnel {
-                tunnelManager.start(port: port)
-            }
+            tunnelManager.start(port: port)
         } catch {
             errorMessage = error.localizedDescription
         }
