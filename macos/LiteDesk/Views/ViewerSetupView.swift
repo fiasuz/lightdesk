@@ -41,7 +41,7 @@ struct ViewerSetupView: View {
                     }
                 }
                 FormField(label: mode == .lan ? "Parol (PIN)" : "Ulanish kodi") {
-                    TextField(mode == .lan ? "" : "masalan: 123456-xxxx.trycloudflare.com", text: $password)
+                    TextField(mode == .lan ? "" : "masalan: 123456-xxxx", text: $password)
                         .textFieldStyle(.roundedBorder)
                 }
 
@@ -107,10 +107,15 @@ struct ViewerSetupView: View {
         }
     }
 
+    /// Every Cloudflare quick tunnel lives under this domain — the host
+    /// strips it off the shared code (see `HostRunningView.connectionCode`)
+    /// so the user never sees it, and it's re-added here.
+    static let tunnelDomainSuffix = ".trycloudflare.com"
+
     /// A connection code (as shown by the host) is `"<6-digit PIN>-<tunnel
-    /// host>"`, e.g. `123456-actual-words.trycloudflare.com`. Splitting on
-    /// the fixed 6-digit PIN prefix (rather than the first "-") is what
-    /// makes this safe even though the tunnel host itself contains hyphens.
+    /// subdomain>"`, e.g. `123456-actual-words`. Splitting on the fixed
+    /// 6-digit PIN prefix (rather than the first "-") is what makes this
+    /// safe even though the tunnel subdomain itself contains hyphens.
     private static func parseConnectionCode(_ raw: String) -> (host: String, pin: String)? {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count > 7 else { return nil }
@@ -118,8 +123,11 @@ struct ViewerSetupView: View {
         guard pin.allSatisfy(\.isNumber) else { return nil }
         let afterPinIndex = trimmed.index(trimmed.startIndex, offsetBy: 6)
         guard trimmed[afterPinIndex] == "-" else { return nil }
-        let host = stripSchemeAndSlashes(String(trimmed[trimmed.index(after: afterPinIndex)...]))
+        var host = stripSchemeAndSlashes(String(trimmed[trimmed.index(after: afterPinIndex)...]))
         guard !host.isEmpty else { return nil }
+        if !host.hasSuffix(tunnelDomainSuffix) {
+            host += tunnelDomainSuffix
+        }
         return (host, pin)
     }
 

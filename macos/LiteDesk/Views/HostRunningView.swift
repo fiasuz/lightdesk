@@ -84,12 +84,18 @@ struct HostRunningView: View {
     /// Bundles the PIN and tunnel host into the single code the viewer's
     /// "Ulanish kodi" field parses (see `ViewerSetupView.parseConnectionCode`)
     /// — the viewer no longer needs the raw tunnel link pasted separately.
+    /// The `.trycloudflare.com` suffix is stripped here (and re-added by the
+    /// viewer when parsing) purely to keep the shared code shorter/cleaner —
+    /// it's implied since every quick tunnel uses that domain.
     private static func connectionCode(pin: String, tunnelURL: String) -> String {
         var host = tunnelURL
         for prefix in ["https://", "http://"] where host.hasPrefix(prefix) {
             host.removeFirst(prefix.count)
         }
         host = host.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if host.hasSuffix(ViewerSetupView.tunnelDomainSuffix) {
+            host.removeLast(ViewerSetupView.tunnelDomainSuffix.count)
+        }
         return "\(pin)-\(host)"
     }
 }

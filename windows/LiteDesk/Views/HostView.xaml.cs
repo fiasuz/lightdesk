@@ -130,7 +130,9 @@ public partial class HostView : UserControl
 
     // Bundles the PIN and tunnel host into the single code the viewer's
     // "Ulanish kodi" field parses (see ViewerView.TryParseConnectionCode) —
-    // the viewer no longer needs the raw tunnel link pasted separately.
+    // the viewer no longer needs the raw tunnel link pasted separately. The
+    // ".trycloudflare.com" suffix is stripped here (and re-added by the
+    // viewer when parsing) so the user never has to see or type it.
     private static string BuildConnectionCode(string pin, string url)
     {
         string host = url;
@@ -139,6 +141,10 @@ public partial class HostView : UserControl
             if (host.StartsWith(prefix, StringComparison.Ordinal)) host = host[prefix.Length..];
         }
         host = host.TrimEnd('/');
+        if (host.EndsWith(ViewerView.TunnelDomainSuffix, StringComparison.Ordinal))
+        {
+            host = host[..^ViewerView.TunnelDomainSuffix.Length];
+        }
         return $"{pin}-{host}";
     }
 

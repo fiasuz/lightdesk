@@ -71,10 +71,15 @@ public partial class ViewerView : UserControl
         return input.TrimEnd('/');
     }
 
+    // Every Cloudflare quick tunnel lives under this domain — the host
+    // strips it off the shared code (see HostView.BuildConnectionCode) so
+    // the user never sees it, and it's re-added here.
+    internal const string TunnelDomainSuffix = ".trycloudflare.com";
+
     // A connection code (as shown by the host) is "<6-digit PIN>-<tunnel
-    // host>", e.g. "123456-actual-words.trycloudflare.com". Splitting on the
-    // fixed 6-digit PIN prefix (rather than the first "-") is what keeps
-    // this safe even though the tunnel host itself contains hyphens.
+    // subdomain>", e.g. "123456-actual-words". Splitting on the fixed
+    // 6-digit PIN prefix (rather than the first "-") is what keeps this
+    // safe even though the tunnel subdomain itself contains hyphens.
     private static bool TryParseConnectionCode(string raw, out string host, out string pin)
     {
         host = string.Empty;
@@ -89,6 +94,10 @@ public partial class ViewerView : UserControl
 
         string normalizedHost = NormalizeTunnelAddress(trimmed[7..]);
         if (string.IsNullOrEmpty(normalizedHost)) return false;
+        if (!normalizedHost.EndsWith(TunnelDomainSuffix, StringComparison.Ordinal))
+        {
+            normalizedHost += TunnelDomainSuffix;
+        }
 
         host = normalizedHost;
         pin = candidatePin;
