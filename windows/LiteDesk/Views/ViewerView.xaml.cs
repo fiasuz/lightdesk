@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -51,11 +52,11 @@ public partial class ViewerView : UserControl
     {
         // Guard against InitializeComponent firing Checked before the panel
         // fields further down in the XAML have been assigned yet.
-        if (LanFieldsPanel is null || InternetFieldsPanel is null) return;
+        if (LanFieldsPanel is null || PasswordLabel is null) return;
 
         bool isLan = LanModeRadio.IsChecked == true;
         LanFieldsPanel.Visibility = isLan ? Visibility.Visible : Visibility.Collapsed;
-        InternetFieldsPanel.Visibility = isLan ? Visibility.Collapsed : Visibility.Visible;
+        PasswordLabel.Text = isLan ? "Parol (PIN)" : "Ulanish kodi";
     }
 
     // Accepts either a pasted full URL (https://xxxx.trycloudflare.com) or a
@@ -70,27 +71,44 @@ public partial class ViewerView : UserControl
         return input.TrimEnd('/');
     }
 
+    // A connection code (as shown by the host) is "<6-digit PIN>-<tunnel
+    // host>", e.g. "123456-actual-words.trycloudflare.com". Splitting on the
+    // fixed 6-digit PIN prefix (rather than the first "-") is what keeps
+    // this safe even though the tunnel host itself contains hyphens.
+    private static bool TryParseConnectionCode(string raw, out string host, out string pin)
+    {
+        host = string.Empty;
+        pin = string.Empty;
+
+        string trimmed = raw.Trim();
+        if (trimmed.Length <= 7) return false;
+
+        string candidatePin = trimmed[..6];
+        if (!candidatePin.All(char.IsDigit)) return false;
+        if (trimmed[6] != '-') return false;
+
+        string normalizedHost = NormalizeTunnelAddress(trimmed[7..]);
+        if (string.IsNullOrEmpty(normalizedHost)) return false;
+
+        host = normalizedHost;
+        pin = candidatePin;
+        return true;
+    }
+
     private async void ConnectButton_Click(object sender, RoutedEventArgs e)
     {
-        string password = PasswordBox.Text.Trim();
-        if (string.IsNullOrEmpty(password))
-        {
-            SetStatus("Parolni kiriting", isError: true);
-            return;
-        }
-
         bool useTunnel = InternetModeRadio.IsChecked == true;
         string host;
         int? port;
         bool useTls;
+        string password;
         string displayAddress;
 
         if (useTunnel)
         {
-            host = NormalizeTunnelAddress(TunnelAddressBox.Text.Trim());
-            if (string.IsNullOrEmpty(host))
+            if (!TryParseConnectionCode(PasswordBox.Text, out host, out password))
             {
-                SetStatus("Tunnel manzilini kiriting", isError: true);
+                SetStatus("Kodni tekshiring — to'liq ulanish kodini kiriting", isError: true);
                 return;
             }
             port = null;
@@ -103,6 +121,12 @@ public partial class ViewerView : UserControl
             if (string.IsNullOrEmpty(host))
             {
                 SetStatus("IP manzilni kiriting", isError: true);
+                return;
+            }
+            password = PasswordBox.Text.Trim();
+            if (string.IsNullOrEmpty(password))
+            {
+                SetStatus("Parolni kiriting", isError: true);
                 return;
             }
             if (!int.TryParse(PortBox.Text, out int parsedPort)) parsedPort = 5900;

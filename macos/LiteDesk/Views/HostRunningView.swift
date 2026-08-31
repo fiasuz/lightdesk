@@ -59,16 +59,17 @@ struct HostRunningView: View {
                 .font(.system(size: 12))
                 .foregroundColor(Palette.subtitle)
         case .running(let url):
+            let code = Self.connectionCode(pin: session.pin, tunnelURL: url)
             VStack(spacing: 6) {
-                Text("Internet orqali manzil").font(.system(size: 12)).foregroundColor(Palette.subtitle)
-                Text(url)
+                Text("Internet orqali ulanish kodi").font(.system(size: 12)).foregroundColor(Palette.subtitle)
+                Text(code)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(Palette.accent)
                     .textSelection(.enabled)
                 Button("Nusxalash") {
                     let pasteboard = NSPasteboard.general
                     pasteboard.clearContents()
-                    pasteboard.setString(url, forType: .string)
+                    pasteboard.setString(code, forType: .string)
                 }
                 .buttonStyle(.link)
                 .font(.system(size: 12))
@@ -78,5 +79,17 @@ struct HostRunningView: View {
                 .font(.system(size: 12))
                 .foregroundColor(Palette.err)
         }
+    }
+
+    /// Bundles the PIN and tunnel host into the single code the viewer's
+    /// "Ulanish kodi" field parses (see `ViewerSetupView.parseConnectionCode`)
+    /// — the viewer no longer needs the raw tunnel link pasted separately.
+    private static func connectionCode(pin: String, tunnelURL: String) -> String {
+        var host = tunnelURL
+        for prefix in ["https://", "http://"] where host.hasPrefix(prefix) {
+            host.removeFirst(prefix.count)
+        }
+        host = host.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        return "\(pin)-\(host)"
     }
 }

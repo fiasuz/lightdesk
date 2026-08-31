@@ -11,7 +11,6 @@ struct ViewerSetupView: View {
     @State private var mode: ConnectionMode = .lan
     @State private var ip: String = ""
     @State private var port: String = "5900"
-    @State private var tunnelAddress: String = ""
     @State private var password: String = ""
     @State private var statusText: String = ""
     @State private var isConnecting = false
@@ -40,14 +39,10 @@ struct ViewerSetupView: View {
                     FormField(label: "Port") {
                         TextField("", text: $port).textFieldStyle(.roundedBorder)
                     }
-                } else {
-                    FormField(label: "Tunnel manzili") {
-                        TextField("masalan: xxxx.trycloudflare.com", text: $tunnelAddress)
-                            .textFieldStyle(.roundedBorder)
-                    }
                 }
-                FormField(label: "Parol (PIN)") {
-                    TextField("", text: $password).textFieldStyle(.roundedBorder)
+                FormField(label: mode == .lan ? "Parol (PIN)" : "Ulanish kodi") {
+                    TextField(mode == .lan ? "" : "masalan: 123456-xxxx.trycloudflare.com", text: $password)
+                        .textFieldStyle(.roundedBorder)
                 }
 
                 if !statusText.isEmpty {
@@ -70,15 +65,10 @@ struct ViewerSetupView: View {
     }
 
     private func connect() {
-        let trimmedPassword = password.trimmingCharacters(in: .whitespaces)
-        guard !trimmedPassword.isEmpty else {
-            statusText = "Parolni kiriting"
-            return
-        }
-
         let resolvedIp: String
         let resolvedPort: Int?
         let useTLS: Bool
+        let authPassword: String
 
         switch mode {
         case .lan:
@@ -87,23 +77,29 @@ struct ViewerSetupView: View {
                 statusText = "IP manzilni kiriting"
                 return
             }
+            let trimmedPassword = password.trimmingCharacters(in: .whitespaces)
+            guard !trimmedPassword.isEmpty else {
+                statusText = "Parolni kiriting"
+                return
+            }
             resolvedIp = trimmedIp
             resolvedPort = Int(port) ?? 5900
             useTLS = false
+            authPassword = trimmedPassword
         case .internet:
-            let cleanedAddress = Self.stripSchemeAndSlashes(tunnelAddress)
-            guard !cleanedAddress.isEmpty else {
-                statusText = "Tunnel manzilini kiriting"
+            guard let parsed = Self.parseConnectionCode(password) else {
+                statusText = "Kodni tekshiring — to'liq ulanish kodini kiriting"
                 return
             }
-            resolvedIp = cleanedAddress
+            resolvedIp = parsed.host
             resolvedPort = nil
             useTLS = true
+            authPassword = parsed.pin
         }
 
         isConnecting = true
         statusText = ""
-        session.connect(ip: resolvedIp, port: resolvedPort, useTLS: useTLS, password: trimmedPassword) { success, error in
+        session.connect(ip: resolvedIp, port: resolvedPort, useTLS: useTLS, password: authPassword) { success, error in
             isConnecting = false
             if !success {
                 statusText = "Xato: " + (error ?? "")
@@ -111,7 +107,23 @@ struct ViewerSetupView: View {
         }
     }
 
-    /// Lets the user paste a full URL (`https://xxxx.trycloudflare.com`) or
+    /// A connection code (as shown by the host) is `"<6-digit PIN>-<tunnel
+    /// host>"`, e.g. `123456-actual-words.trycloudflare.com`. Splitting on
+    /// the fixed 6-digit PIN prefix (rather than the first "-") is what
+    /// makes this safe even though the tunnel host itself contains hyphens.
+    private static func parseConnectionCode(_ raw: String) -> (host: String, pin: String)? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count > 7 else { return nil }
+        let pin = String(trimmed.prefix(6))
+        guard pin.allSatisfy(\.isNumber) else { return nil }
+        let afterPinIndex = trimmed.index(trimmed.startIndex, offsetBy: 6)
+        guard trimmed[afterPinIndex] == "-" else { return nil }
+        let host = stripSchemeAndSlashes(String(trimmed[trimmed.index(after: afterPinIndex)...]))
+        guard !host.isEmpty else { return nil }
+        return (host, pin)
+    }
+
+    /// Lets the host part be a full URL (`https://xxxx.trycloudflare.com`) or
     /// just the bare hostname — both should work.
     private static func stripSchemeAndSlashes(_ raw: String) -> String {
         var address = raw.trimmingCharacters(in: .whitespaces)

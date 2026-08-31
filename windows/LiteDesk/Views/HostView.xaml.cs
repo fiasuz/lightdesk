@@ -16,6 +16,7 @@ public partial class HostView : UserControl
     private readonly MainWindow _window;
     private readonly HostServer _server = new();
     private readonly CloudflareTunnelService _tunnel = new();
+    private string? _connectionCode;
 
     public HostView(MainWindow window)
     {
@@ -104,22 +105,46 @@ public partial class HostView : UserControl
                     TunnelStatusText.Text = "Internet tunnel ochilmoqda...";
                     TunnelStatusText.Foreground = (Brush)FindResource("SubtitleBrush");
                     TunnelStatusText.Visibility = Visibility.Visible;
+                    CopyCodeButton.Visibility = Visibility.Collapsed;
                     break;
                 case TunnelStatus.Running:
-                    TunnelStatusText.Text = $"Internet manzili: {state.Url}";
+                    _connectionCode = BuildConnectionCode(PinDisplayText.Text, state.Url!);
+                    TunnelStatusText.Text = $"Ulanish kodi: {_connectionCode}";
                     TunnelStatusText.Foreground = (Brush)FindResource("OkBrush");
                     TunnelStatusText.Visibility = Visibility.Visible;
+                    CopyCodeButton.Visibility = Visibility.Visible;
                     break;
                 case TunnelStatus.Failed:
                     TunnelStatusText.Text = $"Internet tunnel xatosi: {state.Error}";
                     TunnelStatusText.Foreground = (Brush)FindResource("ErrBrush");
                     TunnelStatusText.Visibility = Visibility.Visible;
+                    CopyCodeButton.Visibility = Visibility.Collapsed;
                     break;
                 default:
                     TunnelStatusText.Visibility = Visibility.Collapsed;
+                    CopyCodeButton.Visibility = Visibility.Collapsed;
                     break;
             }
         });
+    }
+
+    // Bundles the PIN and tunnel host into the single code the viewer's
+    // "Ulanish kodi" field parses (see ViewerView.TryParseConnectionCode) —
+    // the viewer no longer needs the raw tunnel link pasted separately.
+    private static string BuildConnectionCode(string pin, string url)
+    {
+        string host = url;
+        foreach (string prefix in new[] { "https://", "http://" })
+        {
+            if (host.StartsWith(prefix, StringComparison.Ordinal)) host = host[prefix.Length..];
+        }
+        host = host.TrimEnd('/');
+        return $"{pin}-{host}";
+    }
+
+    private void CopyCodeButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_connectionCode is not null) Clipboard.SetText(_connectionCode);
     }
 
     private void OnViewerConnected()

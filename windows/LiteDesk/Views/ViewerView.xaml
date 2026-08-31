@@ -34,12 +34,7 @@
                             <TextBox x:Name="PortBox" Text="5900"/>
                         </StackPanel>
 
-                        <StackPanel x:Name="InternetFieldsPanel" Visibility="Collapsed">
-                            <TextBlock Text="Tunnel manzili" Style="{StaticResource CardLabel}" Margin="0,0,0,6"/>
-                            <TextBox x:Name="TunnelAddressBox"/>
-                        </StackPanel>
-
-                        <TextBlock Text="Parol (PIN)" Style="{StaticResource CardLabel}"/>
+                        <TextBlock x:Name="PasswordLabel" Text="Parol (PIN)" Style="{StaticResource CardLabel}"/>
                         <TextBox x:Name="PasswordBox"/>
 
                         <Button x:Name="ConnectButton" Content="Ulanish" Style="{StaticResource PrimaryButton}" Click="ConnectButton_Click"/>

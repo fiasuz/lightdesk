@@ -50,6 +50,8 @@
 
                     <TextBlock x:Name="TunnelStatusText" FontSize="13" TextWrapping="Wrap" Margin="0,10,0,0"
                                Foreground="{StaticResource SubtitleBrush}" Visibility="Collapsed"/>
+                    <Button x:Name="CopyCodeButton" Content="Nusxalash" Style="{StaticResource SecondaryButton}"
+                            Margin="0,6,0,0" Visibility="Collapsed" Click="CopyCodeButton_Click"/>
 
                     <Button x:Name="StopButton" Content="To'xtatish" Style="{StaticResource SecondaryButton}" Click="StopButton_Click"/>
                 </StackPanel>
