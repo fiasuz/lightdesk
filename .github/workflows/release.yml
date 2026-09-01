@@ -1,0 +1,84 @@
+name: Release
+
+# Builds both native clients and publishes a GitHub Release with the
+# artifacts attached. Windows (WPF) can only be built on a real Windows
+# machine, which the primary dev environment (macOS) doesn't have — this
+# workflow's windows-latest runner is what actually builds/verifies it.
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (e.g. 0.1.0, no leading v)'
+        required: true
+        default: '0.1.0'
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.set.outputs.version }}
+    steps:
+      - id: set
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-macos:
+    needs: version
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build .app and zip
+        run: macos/Packaging/build-app.sh "${{ needs.version.outputs.version }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-dist
+          path: macos/dist/LiteDesk-*-mac.zip
+
+  build-windows:
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Publish
+        run: dotnet publish windows/LiteDesk/LiteDesk.csproj -c Release "/p:Version=${{ needs.version.outputs.version }}"
+      - name: Zip publish output
+        shell: pwsh
+        run: |
+          $publishDir = "windows/LiteDesk/bin/Release/net8.0-windows/win-x64/publish"
+          $zipPath = "LiteDesk-${{ needs.version.outputs.version }}-windows-x64.zip"
+          Compress-Archive -Path "$publishDir/*" -DestinationPath $zipPath
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-dist
+          path: LiteDesk-*-windows-x64.zip
+
+  release:
+    needs: [version, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ needs.version.outputs.version }}" \
+            artifacts/macos-dist/*.zip \
+            artifacts/windows-dist/*.zip \
+            --title "LiteDesk v${{ needs.version.outputs.version }}" \
+            --generate-notes \
+            --repo "${{ github.repository }}"

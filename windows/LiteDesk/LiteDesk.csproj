@@ -12,6 +12,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
 
+    <!-- Default local version; CI overrides via /p:Version at publish time (from the release tag). -->
+    <Version>0.1.0</Version>
+
     <!--
       Publish settings so `dotnet publish -c Release` alone produces the
       self-contained single-exe output the plan calls for (no runtime

@@ -4,7 +4,7 @@
 # toolchains). Produces macos/build/LiteDesk.app and macos/dist/LiteDesk-<version>-mac.zip.
 set -euo pipefail
 
-VERSION="${1:-1.0.0}"
+VERSION="${1:-0.1.0}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MACOS_DIR="$(dirname "$SCRIPT_DIR")"
 
@@ -27,6 +27,8 @@ mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 cp "$BINARY_PATH" "$APP_DIR/Contents/MacOS/LiteDesk"
 cp "$SCRIPT_DIR/Info.plist" "$APP_DIR/Contents/Info.plist"
 cp "$SCRIPT_DIR/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
+plutil -replace CFBundleShortVersionString -string "$VERSION" "$APP_DIR/Contents/Info.plist"
+plutil -replace CFBundleVersion -string "$VERSION" "$APP_DIR/Contents/Info.plist"
 
 echo "==> bundling cloudflared (Internet orqali ulash uchun)"
 CACHE_DIR="$SCRIPT_DIR/.cache"
