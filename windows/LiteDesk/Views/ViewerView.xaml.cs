@@ -1,26 +1,29 @@
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
+using LiteDesk.Localization;
 using LiteDesk.Native;
 using LiteDesk.Protocol;
 using LiteDesk.Services;
 
 namespace LiteDesk.Views;
 
-// Native port of src/renderer/viewer.js: renders incoming JPEG frames onto
-// RemoteImage and captures local mouse input over it, normalized to the
-// same 0..1 coordinate convention the wire protocol uses.
+// "02 Faol seans" — renders incoming JPEG frames onto RemoteImage and
+// captures local mouse/keyboard input over it, normalized to the same 0..1
+// coordinate convention the wire protocol uses. The connect form itself
+// lives on HomeView now; this view only ever handles an already-connected
+// ViewerClient handed to it by MainWindow.NavigateToSession.
 public partial class ViewerView : UserControl
 {
     private const int MouseThrottleMs = 25; // matches MOUSE_THROTTLE_MS in viewer.js
 
     private readonly MainWindow _window;
-    private readonly ViewerClient _client = new();
+    private readonly ViewerClient _client;
     private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
     // Not long.MinValue: `now - _lastMouseMoveMs` in RemoteImage_MouseMove
     // overflows a signed long when subtracting MinValue (wraps to a huge
@@ -31,117 +34,72 @@ public partial class ViewerView : UserControl
     // (now is always >= 0) without any overflow risk.
     private long _lastMouseMoveMs = -MouseThrottleMs;
 
-    public ViewerView(MainWindow window)
+    // Session readout in the topbar: FPS is a real count of frames that
+    // arrived in the last second (Interlocked because frames land on the
+    // WebSocket receive thread, not the UI thread — see OnFrameReceived);
+    // ping is a real round-trip time from PingMessage/PongMessage; elapsed
+    // time is a real stopwatch started on connect. None of these are
+    // simulated.
+    private readonly Stopwatch _sessionStopwatch = new();
+    private readonly DispatcherTimer _statsTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private readonly DispatcherTimer _pingTimer = new() { Interval = TimeSpan.FromSeconds(2) };
+    private int _framesSinceLastTick;
+
+    public ViewerView(MainWindow window, ViewerClient client, string host)
     {
         InitializeComponent();
         _window = window;
+        _client = client;
+
+        RemoteInfoText.Text = string.Format(LocalizationManager.Instance["Session.ConnectedTo"], host);
 
         _client.FrameReceived += OnFrameReceived;
         _client.ConnectionClosed += OnConnectionClosed;
-
-        Unloaded += (_, _) => _client.Disconnect();
-    }
-
-    private void BackLink_Click(object sender, MouseButtonEventArgs e)
-    {
-        _client.Disconnect();
-        _window.NavigateHome();
-    }
-
-    // Accepts either a pasted full URL (https://xxxx.trycloudflare.com) or a
-    // bare hostname (xxxx.trycloudflare.com) and returns just the host part.
-    private static string NormalizeTunnelAddress(string input)
-    {
-        if (input.Contains("://", StringComparison.Ordinal) &&
-            Uri.TryCreate(input, UriKind.Absolute, out Uri? parsed))
+        _client.PongReceived += OnPongReceived;
+        _statsTimer.Tick += (_, _) =>
         {
-            return parsed.Host;
-        }
-        return input.TrimEnd('/');
-    }
+            FpsText.Text = Interlocked.Exchange(ref _framesSinceLastTick, 0).ToString();
+            ViewerElapsedText.Text = _sessionStopwatch.Elapsed.ToString(@"hh\:mm\:ss");
+        };
+        _pingTimer.Tick += (_, _) => _ = _client.SendPingAsync();
 
-    // Every Cloudflare quick tunnel lives under this domain — the host
-    // strips it off the shared code (see HostView.BuildConnectionCode) so
-    // the user never sees it, and it's re-added here.
-    internal const string TunnelDomainSuffix = ".trycloudflare.com";
-
-    // A connection code (as shown by the host) is "<6-digit PIN>-<tunnel
-    // subdomain>", e.g. "123456-actual-words". Splitting on the fixed
-    // 6-digit PIN prefix (rather than the first "-") is what keeps this
-    // safe even though the tunnel subdomain itself contains hyphens.
-    private static bool TryParseConnectionCode(string raw, out string host, out string pin)
-    {
-        host = string.Empty;
-        pin = string.Empty;
-
-        string trimmed = raw.Trim();
-        if (trimmed.Length <= 7) return false;
-
-        string candidatePin = trimmed[..6];
-        if (!candidatePin.All(char.IsDigit)) return false;
-        if (trimmed[6] != '-') return false;
-
-        string normalizedHost = NormalizeTunnelAddress(trimmed[7..]);
-        if (string.IsNullOrEmpty(normalizedHost)) return false;
-        if (!normalizedHost.EndsWith(TunnelDomainSuffix, StringComparison.Ordinal))
+        Loaded += (_, _) =>
         {
-            normalizedHost += TunnelDomainSuffix;
-        }
+            RemoteImage.Focus();
+            _framesSinceLastTick = 0;
+            FpsText.Text = "—";
+            PingText.Text = "—";
+            ViewerElapsedText.Text = "00:00:00";
+            _sessionStopwatch.Restart();
+            _statsTimer.Start();
+            _pingTimer.Start();
+        };
 
-        host = normalizedHost;
-        pin = candidatePin;
-        return true;
-    }
-
-    private async void ConnectButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (!TryParseConnectionCode(PasswordBox.Text, out string host, out string password))
+        Unloaded += (_, _) =>
         {
-            SetStatus("Kodni tekshiring — to'liq ulanish kodini kiriting", isError: true);
-            return;
-        }
-
-        SetStatus("Ulanmoqda...", isError: false);
-        ConnectButton.IsEnabled = false;
-
-        var (success, error, _, _) = await _client.ConnectAsync(host, password);
-        ConnectButton.IsEnabled = true;
-
-        if (!success)
-        {
-            SetStatus($"Xato: {error}", isError: true);
-            return;
-        }
-
-        RemoteInfoText.Text = $"{host} bilan ulanildi";
-        RemoteImage.Source = null;
-        SetupScreen.Visibility = Visibility.Collapsed;
-        RemoteScreen.Visibility = Visibility.Visible;
-        RemoteImage.Focus();
+            _client.FrameReceived -= OnFrameReceived;
+            _client.ConnectionClosed -= OnConnectionClosed;
+            _client.PongReceived -= OnPongReceived;
+            _statsTimer.Stop();
+            _pingTimer.Stop();
+            _client.Disconnect();
+        };
     }
 
     private void DisconnectButton_Click(object sender, RoutedEventArgs e)
     {
         _client.Disconnect();
-        BackToSetup();
+        _window.NavigateHome();
     }
 
     private void OnConnectionClosed()
     {
-        Dispatcher.Invoke(BackToSetup);
+        Dispatcher.Invoke(() => _window.NavigateHome());
     }
 
-    private void BackToSetup()
+    private void OnPongReceived(double rttMs)
     {
-        RemoteScreen.Visibility = Visibility.Collapsed;
-        SetupScreen.Visibility = Visibility.Visible;
-        SetStatus("Ulanish uzildi", isError: true);
-    }
-
-    private void SetStatus(string text, bool isError)
-    {
-        StatusText.Text = text;
-        StatusText.Foreground = (Brush)FindResource(isError ? "ErrBrush" : "SubtitleBrush");
+        Dispatcher.Invoke(() => PingText.Text = $"{Math.Round(rttMs)} ms");
     }
 
     // Frames arrive on the WebSocket receive loop's background thread, not
@@ -149,6 +107,7 @@ public partial class ViewerView : UserControl
     // RemoteImage.
     private void OnFrameReceived(byte[] jpegBytes)
     {
+        Interlocked.Increment(ref _framesSinceLastTick);
         _ = Dispatcher.InvokeAsync(() =>
         {
             try
@@ -165,41 +124,21 @@ public partial class ViewerView : UserControl
         });
     }
 
-    // TEMP DIAGNOSTIC — remove once the live-move bug is root-caused.
-    private static void DebugLog(string line)
-    {
-        try
-        {
-            string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "litedesk-viewer-debug.log");
-            System.IO.File.AppendAllText(path, $"{DateTime.Now:HH:mm:ss.fff} VIEW {line}{Environment.NewLine}");
-        }
-        catch { /* diagnostic only */ }
-    }
-
     private void RemoteImage_MouseMove(object sender, MouseEventArgs e)
     {
         long now = _stopwatch.ElapsedMilliseconds;
-        if (now - _lastMouseMoveMs < MouseThrottleMs)
-        {
-            DebugLog("MouseMove fired, throttled");
-            return;
-        }
+        if (now - _lastMouseMoveMs < MouseThrottleMs) return;
         _lastMouseMoveMs = now;
 
-        if (!TryGetNormalizedPosition(e, out double x, out double y))
-        {
-            DebugLog("MouseMove fired, TryGetNormalizedPosition FAILED (outside displayed image / no frame yet)");
-            return;
-        }
-        DebugLog($"MouseMove fired, sending x={x:F3} y={y:F3}");
+        if (!TryGetNormalizedPosition(e, out double x, out double y)) return;
         _ = _client.SendMouseEventAsync(new MouseMoveMessage { X = x, Y = y });
     }
 
     private void RemoteImage_MouseDown(object sender, MouseButtonEventArgs e)
     {
         // Clicking the remote surface is also how keyboard focus lands back
-        // on it (e.g. after the user was typing in the IP/password fields on
-        // SetupScreen, or clicked some other window and came back).
+        // on it (e.g. after the user was typing in the connection-address
+        // box on HomeView, or clicked some other window and came back).
         RemoteImage.Focus();
         if (!TryGetNormalizedPosition(e, out double x, out double y)) return;
         _ = _client.SendMouseEventAsync(new MouseDownMessage { X = x, Y = y, Button = ButtonName(e.ChangedButton) });
@@ -213,21 +152,11 @@ public partial class ViewerView : UserControl
     private void RemoteImage_MouseWheel(object sender, MouseWheelEventArgs e)
     {
         // WPF's Delta uses the OPPOSITE sign convention from a browser
-        // `wheel` event's deltaY: WPF positive = wheel rotated
-        // forward/away from the user (traditionally scrolls content up),
-        // while a JS wheel event's positive deltaY means "scroll down"
-        // (the convention src/mouseControl.js's dy handling was written
-        // against, and that Windows' own MouseInjector.Scroll — see its
-        // inline comment — passes straight through to SendInput without
-        // re-inverting). Negating here is the best reasoning available
-        // without a real mouse to test against; verify the net direction
-        // feels right end-to-end (viewer wheel -> wire -> host cursor)
-        // once this and the host build both run on real hardware.
-        //
-        // Only vertical scroll is wired — WPF has no standard horizontal
-        // wheel event without a raw WM_MOUSEHWHEEL hook, so Dx is always 0
-        // here (a deliberate simplification vs. the browser-based viewer,
-        // which does forward trackpad deltaX).
+        // `wheel` event's deltaY — see the original inline note in the
+        // pre-redesign ViewerView.xaml.cs (git history) for the full
+        // reasoning; only vertical scroll is wired (Dx is always 0), since
+        // WPF has no standard horizontal wheel event without a raw
+        // WM_MOUSEHWHEEL hook.
         double dy = -e.Delta;
         _ = _client.SendMouseEventAsync(new MouseScrollMessage { Dx = 0, Dy = dy });
         e.Handled = true;

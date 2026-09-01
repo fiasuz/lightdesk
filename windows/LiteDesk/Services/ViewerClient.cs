@@ -30,6 +30,10 @@ public sealed class ViewerClient
 
     public event Action<byte[]>? FrameReceived;
     public event Action? ConnectionClosed;
+    // RTT (ms) measured from a pong that echoed a ping this client sent —
+    // see SendPingAsync(). The host may also ping this client at any time;
+    // that's answered with an immediate pong inside ReceiveLoopAsync.
+    public event Action<double>? PongReceived;
 
     public bool IsConnected => _socket?.State == WebSocketState.Open;
 
@@ -121,6 +125,12 @@ public sealed class ViewerClient
         catch { /* diagnostic only */ }
     }
 
+    // Proactively probes the host's latency — called on a ~2s UI timer while
+    // connected. The host replies with a pong (see HostServer.RunConnectionAsync)
+    // that PongReceived reports as RTT ms.
+    public Task SendPingAsync() =>
+        SendMouseEventAsync(new PingMessage { Ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0 });
+
     public async Task SendMouseEventAsync(WireMessage message)
     {
         ClientWebSocket? socket = _socket;
@@ -194,8 +204,24 @@ public sealed class ViewerClient
                 {
                     FrameReceived?.Invoke(ms.ToArray());
                 }
-                // Text messages other than the initial auth-ok/auth-fail
-                // aren't expected post-handshake in this protocol; ignore.
+                else if (messageType == WebSocketMessageType.Text)
+                {
+                    // Only ping/pong are expected here post-handshake (the
+                    // host may probe latency at any time, same as this
+                    // client does via SendPingAsync); anything else is
+                    // ignored rather than treated as a protocol error.
+                    string text = Encoding.UTF8.GetString(ms.ToArray());
+                    WireMessage? reply = WireMessageParser.TryParse(text);
+                    if (reply is PingMessage ping)
+                    {
+                        _ = SendMouseEventAsync(new PongMessage { Ts = ping.Ts });
+                    }
+                    else if (reply is PongMessage pong)
+                    {
+                        double nowSeconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0;
+                        PongReceived?.Invoke((nowSeconds - pong.Ts) * 1000.0);
+                    }
+                }
             }
         }
         catch (Exception ex) when (ex is WebSocketException or OperationCanceledException or ObjectDisposedException)

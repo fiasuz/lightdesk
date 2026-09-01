@@ -1,61 +1,59 @@
 <UserControl x:Class="LiteDesk.Views.ViewerView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid Background="{StaticResource BgBrush}">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:LiteDesk.Localization">
+    <!--
+        "02 Faol seans" — this view now only ever shows an already-connected
+        session (the connect form lives on HomeView); see ViewerView.xaml.cs.
+    -->
+    <Grid Background="Black">
+        <!--
+            Cursor="None" — the remote host's own cursor is what the user
+            sees inside the JPEG frames, so the local cursor is hidden while
+            hovering the remote surface.
+        -->
+        <Image x:Name="RemoteImage" Stretch="Uniform" Cursor="None"
+               Focusable="True" FocusVisualStyle="{x:Null}"
+               MouseMove="RemoteImage_MouseMove"
+               MouseDown="RemoteImage_MouseDown"
+               MouseUp="RemoteImage_MouseUp"
+               MouseWheel="RemoteImage_MouseWheel"
+               ContextMenuOpening="RemoteImage_ContextMenuOpening"
+               PreviewKeyDown="RemoteImage_PreviewKeyDown"
+               PreviewKeyUp="RemoteImage_PreviewKeyUp"/>
 
-        <Grid x:Name="SetupScreen">
-            <TextBlock Text="&#8592; Orqaga" Foreground="{StaticResource SubtitleBrush}"
-                       HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16"
-                       Cursor="Hand" MouseLeftButtonUp="BackLink_Click"/>
+        <Border Background="{StaticResource TopbarBrush}" VerticalAlignment="Top" Height="40">
+            <DockPanel LastChildFill="False" Margin="14,0">
+                <Ellipse Width="8" Height="8" Fill="{StaticResource OkBrush}"
+                         VerticalAlignment="Center" DockPanel.Dock="Left"/>
+                <TextBlock x:Name="RemoteInfoText" Foreground="White"
+                           FontFamily="{StaticResource HeadingFont}"
+                           FontSize="13" Margin="10,0,0,0" VerticalAlignment="Center" DockPanel.Dock="Left"/>
 
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="380">
-                <TextBlock Text="Boshqa kompyuterga ulanish" FontSize="22" Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center"/>
-                <TextBlock Text="Boshqa kompyuterda ko'rsatilgan ulanish kodini kiriting"
-                           FontSize="13" Foreground="{StaticResource SubtitleBrush}"
-                           Margin="0,4,0,32" TextAlignment="Center" TextWrapping="Wrap"/>
+                <!-- Live session readout — Ping from real ping/pong RTT,
+                     FPS from frames that actually arrived, elapsed time
+                     from a real stopwatch (see ViewerView.xaml.cs). None of
+                     these are simulated. -->
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" Margin="24,0,0,0">
+                    <TextBlock Text="{Binding Source={x:Static loc:LocalizationManager.Instance}, Path=[Common.Ping]}"
+                               Foreground="#99FFFFFF" FontSize="11" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="PingText" Text="—" Foreground="White" FontFamily="{StaticResource HeadingFont}"
+                               FontSize="13" Margin="6,0,18,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding Source={x:Static loc:LocalizationManager.Instance}, Path=[Common.Fps]}"
+                               Foreground="#99FFFFFF" FontSize="11" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="FpsText" Text="—" Foreground="White" FontFamily="{StaticResource HeadingFont}"
+                               FontSize="13" Margin="6,0,18,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding Source={x:Static loc:LocalizationManager.Instance}, Path=[Common.Time]}"
+                               Foreground="#99FFFFFF" FontSize="11" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="ViewerElapsedText" Text="00:00:00" Foreground="White" FontFamily="{StaticResource HeadingFont}"
+                               FontSize="13" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                </StackPanel>
 
-                <Border Style="{StaticResource Card}">
-                    <StackPanel>
-                        <TextBlock Text="Ulanish kodi" Style="{StaticResource CardLabel}"/>
-                        <TextBox x:Name="PasswordBox"/>
-
-                        <Button x:Name="ConnectButton" Content="Ulanish" Style="{StaticResource PrimaryButton}" Click="ConnectButton_Click"/>
-                        <TextBlock x:Name="StatusText" Margin="0,14,0,0" FontSize="13" TextWrapping="Wrap"
-                                   Foreground="{StaticResource SubtitleBrush}"/>
-                    </StackPanel>
-                </Border>
-            </StackPanel>
-        </Grid>
-
-        <Grid x:Name="RemoteScreen" Background="Black" Visibility="Collapsed">
-            <!--
-                Cursor="None" matches .viewer-wrap canvas { cursor: none }
-                in style.css — the remote host's own cursor is what the
-                user sees inside the JPEG frames, so the local cursor is
-                hidden while hovering the remote surface.
-            -->
-            <Image x:Name="RemoteImage" Stretch="Uniform" Cursor="None"
-                   Focusable="True" FocusVisualStyle="{x:Null}"
-                   MouseMove="RemoteImage_MouseMove"
-                   MouseDown="RemoteImage_MouseDown"
-                   MouseUp="RemoteImage_MouseUp"
-                   MouseWheel="RemoteImage_MouseWheel"
-                   ContextMenuOpening="RemoteImage_ContextMenuOpening"
-                   PreviewKeyDown="RemoteImage_PreviewKeyDown"
-                   PreviewKeyUp="RemoteImage_PreviewKeyUp"/>
-
-            <Border Background="{StaticResource TopbarBrush}" VerticalAlignment="Top" Height="40">
-                <DockPanel LastChildFill="False" Margin="14,0">
-                    <Ellipse Width="8" Height="8" Fill="{StaticResource OkBrush}"
-                             VerticalAlignment="Center" DockPanel.Dock="Left"/>
-                    <TextBlock x:Name="RemoteInfoText" Text="Ulandi" Foreground="{StaticResource SubtitleBrush}"
-                               FontSize="13" Margin="10,0,0,0" VerticalAlignment="Center" DockPanel.Dock="Left"/>
-                    <Button x:Name="DisconnectButton" Content="Uzish" DockPanel.Dock="Right" VerticalAlignment="Center"
-                            Padding="12,6" Background="{StaticResource BorderBrush}" Foreground="{StaticResource TextBrush}"
-                            BorderThickness="0" FontSize="12" Cursor="Hand" Click="DisconnectButton_Click"/>
-                </DockPanel>
-            </Border>
-        </Grid>
-
+                <Button x:Name="DisconnectButton" DockPanel.Dock="Right" VerticalAlignment="Center"
+                        Style="{StaticResource SecondaryButton}" Foreground="White" BorderBrush="#33FFFFFF"
+                        Padding="12,6" FontSize="12" Click="DisconnectButton_Click"
+                        Content="{Binding Source={x:Static loc:LocalizationManager.Instance}, Path=[Session.Disconnect]}"/>
+            </DockPanel>
+        </Border>
     </Grid>
 </UserControl>

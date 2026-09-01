@@ -50,6 +50,11 @@ public sealed class CloudflareTunnelService
 
     public event Action<TunnelState>? StateChanged;
 
+    // Lets a freshly (re)constructed view read the current state instead of
+    // only ever reacting to StateChanged — needed once hosting is owned by
+    // MainWindow and outlives any single HomeView instance (see HomeView).
+    public TunnelState CurrentState { get; private set; } = TunnelState.Idle;
+
     // Pure/testable: extracts a quick-tunnel URL from one line of cloudflared
     // output (it prints the assigned URL to stderr), or null if absent.
     public static string? TryExtractTunnelUrl(string line)
@@ -94,11 +99,13 @@ public sealed class CloudflareTunnelService
         string? exePath = ResolveCloudflaredPath();
         if (exePath is null)
         {
-            StateChanged?.Invoke(TunnelState.Failed("cloudflared.exe topilmadi"));
+            CurrentState = TunnelState.Failed("cloudflared.exe topilmadi");
+            StateChanged?.Invoke(CurrentState);
             return;
         }
 
-        StateChanged?.Invoke(TunnelState.Starting);
+        CurrentState = TunnelState.Starting;
+        StateChanged?.Invoke(CurrentState);
         _urlReported = false;
 
         var startInfo = new ProcessStartInfo
@@ -122,7 +129,8 @@ public sealed class CloudflareTunnelService
         catch (Exception ex)
         {
             process.Dispose();
-            StateChanged?.Invoke(TunnelState.Failed(ex.Message));
+            CurrentState = TunnelState.Failed(ex.Message);
+            StateChanged?.Invoke(CurrentState);
             return;
         }
 
@@ -143,12 +151,14 @@ public sealed class CloudflareTunnelService
         if (url is null) return;
 
         _urlReported = true;
-        StateChanged?.Invoke(TunnelState.Running(url));
+        CurrentState = TunnelState.Running(url);
+        StateChanged?.Invoke(CurrentState);
     }
 
     public void Stop()
     {
         _urlReported = false;
+        CurrentState = TunnelState.Idle;
 
         Process? process = _process;
         _process = null;

@@ -53,7 +53,20 @@ public sealed class HostServer
     public event Action<string>? ServerError;
     public event Action<WireMessage>? MouseMessageReceived;
 
+    // RTT (ms) measured from a pong that echoed a ping this host sent — see
+    // SendPingAsync(). OutgoingStatsUpdated reports real capture throughput
+    // (frames/sec, kbit/sec) once a second, computed from the same frames
+    // actually pushed to the viewer, not a guessed number.
+    public event Action<double>? PongReceived;
+    public event Action<int, double>? OutgoingStatsUpdated;
+
     public bool IsRunning => _listener is not null;
+    public bool HasViewer { get { lock (_viewerLock) { return _viewerSocket is not null; } } }
+    public string? CurrentPassword => IsRunning ? _password : null;
+
+    private int _frameCountThisSecond;
+    private long _byteCountThisSecond;
+    private System.Threading.Timer? _statsTimer;
 
     public HostServer()
     {
@@ -64,7 +77,12 @@ public sealed class HostServer
         ViewerConnected += OnViewerConnectedStartCaptureAndInjection;
         ViewerDisconnected += OnViewerDisconnectedStopCaptureAndInjection;
 
-        _screenCapture.FrameCaptured += frame => _ = SendFrameAsync(frame);
+        _screenCapture.FrameCaptured += frame =>
+        {
+            Interlocked.Increment(ref _frameCountThisSecond);
+            Interlocked.Add(ref _byteCountThisSecond, frame.Length);
+            _ = SendFrameAsync(frame);
+        };
         _screenCapture.CaptureError += msg => ServerError?.Invoke(msg);
     }
 
@@ -76,6 +94,16 @@ public sealed class HostServer
         _mouseInjector.Start();
         _keyInjector.Start();
         _screenCapture.Start();
+
+        _frameCountThisSecond = 0;
+        _byteCountThisSecond = 0;
+        _statsTimer = new System.Threading.Timer(_ =>
+        {
+            int fps = Interlocked.Exchange(ref _frameCountThisSecond, 0);
+            long bytes = Interlocked.Exchange(ref _byteCountThisSecond, 0);
+            double kbps = bytes * 8.0 / 1000.0;
+            OutgoingStatsUpdated?.Invoke(fps, kbps);
+        }, null, 1000, 1000);
     }
 
     private void OnViewerDisconnectedStopCaptureAndInjection()
@@ -83,6 +111,28 @@ public sealed class HostServer
         _screenCapture.Stop();
         _mouseInjector.Stop();
         _keyInjector.Stop();
+        _statsTimer?.Dispose();
+        _statsTimer = null;
+    }
+
+    // Proactively probes the connected viewer's latency — called on a
+    // ~2s UI timer while a viewer is connected. The viewer replies with a
+    // pong (see RunConnectionAsync) that PongReceived reports as RTT ms.
+    public async Task SendPingAsync()
+    {
+        WebSocket? socket;
+        lock (_viewerLock) { socket = _viewerSocket; }
+        if (socket is null || socket.State != WebSocketState.Open) return;
+
+        double ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0;
+        try
+        {
+            await SendJsonAsync(socket, new PingMessage { Ts = ts }, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch
+        {
+            // Viewer likely disconnecting; the receive loop will observe it.
+        }
     }
 
     public (bool Success, string? Error) Start(int port, string password)
@@ -285,6 +335,15 @@ public sealed class HostServer
             else if (msg is KeyDownMessage or KeyUpMessage)
             {
                 _keyInjector.Enqueue(msg);
+            }
+            else if (msg is PingMessage ping)
+            {
+                await SendJsonAsync(socket, new PongMessage { Ts = ping.Ts }, ct).ConfigureAwait(false);
+            }
+            else if (msg is PongMessage pong)
+            {
+                double nowSeconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0;
+                PongReceived?.Invoke((nowSeconds - pong.Ts) * 1000.0);
             }
         }
     }

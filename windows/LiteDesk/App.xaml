@@ -4,83 +4,174 @@
              StartupUri="MainWindow.xaml">
     <Application.Resources>
 
-        <!-- Palette ported 1:1 from src/renderer/style.css -->
-        <SolidColorBrush x:Key="BgBrush" Color="#14171C"/>
-        <SolidColorBrush x:Key="CardBrush" Color="#1E2229"/>
-        <SolidColorBrush x:Key="CardHoverBrush" Color="#232834"/>
-        <SolidColorBrush x:Key="BorderBrush" Color="#2B303A"/>
-        <SolidColorBrush x:Key="TextBrush" Color="#E8EAED"/>
-        <SolidColorBrush x:Key="SubtitleBrush" Color="#9AA0A6"/>
-        <SolidColorBrush x:Key="AccentBrush" Color="#4C8BF5"/>
-        <SolidColorBrush x:Key="AccentHoverBrush" Color="#3D7DE0"/>
-        <SolidColorBrush x:Key="OkBrush" Color="#6BCF7F"/>
-        <SolidColorBrush x:Key="ErrBrush" Color="#F28B82"/>
-        <SolidColorBrush x:Key="TopbarBrush" Color="#D914171C"/>
+        <!--
+            Palette ported from the "industry" design-system tokens
+            (claude.ai/design project "Remote desktop application design",
+            _ds/industry-*/styles.css) — a light, hairline-bordered
+            "blueprint" look: square corners, thin dividers, small outward
+            corner brackets on every panel. Muted/divider tones reuse the
+            CSS color-mix(text, N%) trick via SolidColorBrush.Opacity.
+        -->
+        <SolidColorBrush x:Key="BgBrush" Color="#F2F2F3"/>
+        <SolidColorBrush x:Key="SurfaceBrush" Color="#E9E9EA"/>
+        <SolidColorBrush x:Key="TextBrush" Color="#1D1F20"/>
+        <SolidColorBrush x:Key="SubtitleBrush" Color="#1D1F20" Opacity="0.55"/>
+        <SolidColorBrush x:Key="FaintTextBrush" Color="#1D1F20" Opacity="0.45"/>
+        <SolidColorBrush x:Key="DividerBrush" Color="#1D1F20" Opacity="0.16"/>
+        <SolidColorBrush x:Key="CornerBrush" Color="#1D1F20" Opacity="0.55"/>
+
+        <SolidColorBrush x:Key="AccentBrush" Color="#5980A6"/>
+        <SolidColorBrush x:Key="AccentHoverBrush" Color="#597EA3"/>
+        <SolidColorBrush x:Key="AccentPressedBrush" Color="#416180"/>
+        <SolidColorBrush x:Key="AccentSoftBrush" Color="#EEF6FF"/>
+        <SolidColorBrush x:Key="AccentSoftTextBrush" Color="#2C455D"/>
+        <SolidColorBrush x:Key="AccentDeepBrush" Color="#1D2D3D"/>
+
+        <!-- Semantic status colors, re-tuned for contrast on a light ground
+             (the old dark-theme OkBrush/ErrBrush were too pale here). -->
+        <SolidColorBrush x:Key="OkBrush" Color="#2E7D46"/>
+        <SolidColorBrush x:Key="ErrBrush" Color="#B3261E"/>
+
+        <!-- Kept for the ViewerView remote-surface topbar, which sits over
+             video rather than the app background. -->
+        <SolidColorBrush x:Key="TopbarBrush" Color="#D91D2D3D"/>
+
+        <!--
+            Headings use the "Segoe UI Semibold" family (a real distinct
+            family on Windows 10/11, not just a weight) to approximate the
+            design's Barlow Condensed display face; body text stays plain
+            Segoe UI. WPF has no letter-spacing property, so the CSS
+            tracking on kickers/labels is approximated with uppercase text
+            alone.
+        -->
+        <FontFamily x:Key="HeadingFont">Segoe UI Semibold, Segoe UI</FontFamily>
+
+        <Style x:Key="KickerText" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource HeadingFont}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{StaticResource AccentPressedBrush}"/>
+        </Style>
 
         <Style x:Key="CardLabel" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource SubtitleBrush}"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Margin" Value="0,14,0,6"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
         </Style>
 
-        <Style x:Key="Card" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource CardBrush}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="12"/>
-            <Setter Property="Padding" Value="24"/>
-        </Style>
-
-        <Style x:Key="ModeCard" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource CardBrush}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="12"/>
-            <Setter Property="Padding" Value="16,28"/>
-            <Setter Property="Width" Value="200"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                    <Setter Property="Background" Value="{StaticResource CardHoverBrush}"/>
-                </Trigger>
-            </Style.Triggers>
+        <!-- ============ Blueprint panel corner-bracket motif ============
+             BlueprintPanel.xaml is the reusable control (hairline border +
+             4 outward L-marks); these two Style keys only cover the plain
+             legacy Border look still used for a couple of small chips. -->
+        <Style x:Key="Divider" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource DividerBrush}"/>
+            <Setter Property="Height" Value="1"/>
         </Style>
 
         <Style TargetType="TextBox">
-            <Setter Property="Padding" Value="9,7"/>
-            <Setter Property="Background" Value="{StaticResource BgBrush}"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource DividerBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="FontSize" Value="14"/>
-            <Setter Property="CaretBrush" Value="{StaticResource TextBrush}"/>
+            <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}"/>
         </Style>
 
+        <!-- ============ Buttons — square corners, hairline or solid fill ============ -->
         <Style x:Key="PrimaryButton" TargetType="Button">
-            <Setter Property="Margin" Value="0,20,0,0"/>
-            <Setter Property="Padding" Value="11"/>
+            <Setter Property="Padding" Value="16,11"/>
             <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
-            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Foreground" Value="{StaticResource BgBrush}"/>
+            <Setter Property="FontFamily" Value="{StaticResource HeadingFont}"/>
             <Setter Property="FontSize" Value="14"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="{StaticResource AccentHoverBrush}"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="{StaticResource AccentPressedBrush}"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.45"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
         <Style x:Key="SecondaryButton" TargetType="Button">
-            <Setter Property="Margin" Value="0,10,0,0"/>
-            <Setter Property="Padding" Value="10"/>
+            <Setter Property="Padding" Value="14,9"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="FontFamily" Value="{StaticResource HeadingFont}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="BorderBrush" Value="{StaticResource DividerBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#121D1F20"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#241D1F20"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Numbered badge ("1", "2") used ahead of a panel's heading. -->
+        <Style x:Key="StepBadge" TargetType="Border">
+            <Setter Property="Width" Value="28"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+        </Style>
+        <Style x:Key="StepBadgeText" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource HeadingFont}"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="Foreground" Value="{StaticResource BgBrush}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- Small status pill ("Berilgan" / "Kerak"). -->
+        <Style x:Key="TagAccent" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource AccentSoftBrush}"/>
+            <Setter Property="Padding" Value="8,3"/>
+        </Style>
+        <Style x:Key="TagAccentText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource AccentSoftTextBrush}"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+        <Style x:Key="TagOutline" TargetType="Border">
+            <Setter Property="BorderBrush" Value="{StaticResource DividerBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,3"/>
+        </Style>
+        <Style x:Key="TagOutlineText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource SubtitleBrush}"/>
+            <Setter Property="FontSize" Value="11"/>
         </Style>
 
     </Application.Resources>

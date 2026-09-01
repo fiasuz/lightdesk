@@ -102,3 +102,24 @@ public sealed class KeyUpMessage : WireMessage
     [JsonPropertyName("code")]
     public string Code { get; set; } = "";
 }
+
+// Bidirectional keepalive/latency probe: either side may send a ping at any
+// time; the other side replies with a pong echoing the same `ts` unchanged,
+// so the sender can compute round-trip time as (now - ts). `ts` is Unix
+// epoch seconds (a double, sub-second precision) — must match the macOS
+// app's Date().timeIntervalSince1970 encoding byte-for-byte.
+public sealed class PingMessage : WireMessage
+{
+    public PingMessage() { Type = "ping"; }
+
+    [JsonPropertyName("ts")]
+    public double Ts { get; set; }
+}
+
+public sealed class PongMessage : WireMessage
+{
+    public PongMessage() { Type = "pong"; }
+
+    [JsonPropertyName("ts")]
+    public double Ts { get; set; }
+}
