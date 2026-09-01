@@ -39,7 +39,7 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- 1: my address -->
-                    <views:BlueprintPanel Grid.Column="0" Padding="22" Background="{StaticResource BgBrush}">
+                    <views:BlueprintPanel x:Name="MyAddressPanel" Grid.Column="0" Padding="22" Background="{StaticResource BgBrush}">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
                                 <Border Style="{StaticResource StepBadge}">
@@ -54,7 +54,7 @@
                                 </StackPanel>
                             </StackPanel>
 
-                            <views:BlueprintPanel Padding="16" Background="{StaticResource SurfaceBrush}" Margin="0,18,0,0">
+                            <views:BlueprintPanel x:Name="MyAddressValuePanel" Padding="16" Background="{StaticResource SurfaceBrush}" Margin="0,18,0,0">
                                 <StackPanel>
                                     <TextBlock Text="{Binding Source={x:Static loc:LocalizationManager.Instance}, Path=[Home.MyAddress.Label]}"
                                                Style="{StaticResource CardLabel}"/>
