@@ -53,16 +53,24 @@ struct HomeView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .lastTextBaseline, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("LITEDESK").heading(28, tracking: -0.3)
-                Text(loc.t(.appTagline))
-                    .font(.system(size: 12.5))
-                    .foregroundColor(Palette.subtitle)
-            }
+        HStack(alignment: .center, spacing: 16) {
+            logoMark
             Spacer()
             LanguagePicker()
         }
+    }
+
+    /// Replaces the old "LITEDESK" wordmark + tagline: the arrow-cursor logo
+    /// on its navy square (DesignPalette.accent900, the design's darkest
+    /// accent tone), matching the same mark used in the Windows client.
+    private var logoMark: some View {
+        ZStack {
+            Rectangle().fill(DesignPalette.accent900)
+            Image(systemName: "cursorarrow")
+                .font(.system(size: 20, weight: .regular))
+                .foregroundColor(.white)
+        }
+        .frame(width: 44, height: 44)
     }
 }
 

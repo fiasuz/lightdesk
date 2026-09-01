@@ -26,6 +26,7 @@ rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 cp "$BINARY_PATH" "$APP_DIR/Contents/MacOS/LiteDesk"
 cp "$SCRIPT_DIR/Info.plist" "$APP_DIR/Contents/Info.plist"
+cp "$SCRIPT_DIR/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
 
 echo "==> bundling cloudflared (Internet orqali ulash uchun)"
 CACHE_DIR="$SCRIPT_DIR/.cache"
