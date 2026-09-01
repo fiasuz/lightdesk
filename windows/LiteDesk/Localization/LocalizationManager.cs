@@ -197,5 +197,35 @@ public sealed class LocalizationManager : INotifyPropertyChanged
             [AppLanguage.Ru] = "Соединение разорвано",
             [AppLanguage.En] = "Disconnected",
         },
+        ["ConnectionRequest.Title"] = new()
+        {
+            [AppLanguage.Uz] = "Ulanish so'rovi",
+            [AppLanguage.Ru] = "Запрос на подключение",
+            [AppLanguage.En] = "Connection request",
+        },
+        ["ConnectionRequest.Message"] = new()
+        {
+            [AppLanguage.Uz] = "Kimdir sizga ulanishni so'ramoqda. Ruxsat berasizmi?",
+            [AppLanguage.Ru] = "Кто-то запрашивает подключение к вам. Разрешить?",
+            [AppLanguage.En] = "Someone is requesting to connect to you. Allow it?",
+        },
+        ["ConnectionRequest.From"] = new()
+        {
+            [AppLanguage.Uz] = "Manba",
+            [AppLanguage.Ru] = "Источник",
+            [AppLanguage.En] = "From",
+        },
+        ["ConnectionRequest.Approve"] = new()
+        {
+            [AppLanguage.Uz] = "Ruxsat berish",
+            [AppLanguage.Ru] = "Разрешить",
+            [AppLanguage.En] = "Allow",
+        },
+        ["ConnectionRequest.Decline"] = new()
+        {
+            [AppLanguage.Uz] = "Rad etish",
+            [AppLanguage.Ru] = "Отклонить",
+            [AppLanguage.En] = "Decline",
+        },
     };
 }

@@ -18,6 +18,9 @@ final class WebSocketServerAuthTests: XCTestCase {
 
         let connectedExpectation = expectation(description: "viewer connected")
         server.onViewerConnected = { connectedExpectation.fulfill() }
+        // A correct password only parks the connection — it doesn't finish
+        // until the host approves it.
+        server.onConnectionRequest = { _ in server.approveConnection() }
 
         let session = URLSession(configuration: .default)
         let task = session.webSocketTask(with: URL(string: "ws://127.0.0.1:\(port)/")!)
@@ -79,6 +82,76 @@ final class WebSocketServerAuthTests: XCTestCase {
         wait(for: [authFailExpectation], timeout: 5.0)
     }
 
+    func testCorrectPasswordWaitsForHostApprovalBeforeAuthOk() throws {
+        let server = WebSocketServer()
+        server.screenSizeProvider = { () in (width: 100, height: 100) }
+        let port = randomPort()
+        try server.start(port: port, password: "secret123")
+        defer { server.stop() }
+
+        let requestExpectation = expectation(description: "connection request raised")
+        server.onConnectionRequest = { _ in requestExpectation.fulfill() }
+        // Fulfilled by `onViewerConnected` firing before we ever call
+        // `approveConnection()` below — should never happen.
+        let prematureConnectExpectation = expectation(description: "viewer connected before approval")
+        prematureConnectExpectation.isInverted = true
+        let connectedExpectation = expectation(description: "viewer connected after approval")
+        server.onViewerConnected = {
+            prematureConnectExpectation.fulfill()
+            connectedExpectation.fulfill()
+        }
+
+        let session = URLSession(configuration: .default)
+        let task = session.webSocketTask(with: URL(string: "ws://127.0.0.1:\(port)/")!)
+        task.resume()
+        defer { task.cancel(with: .normalClosure, reason: nil) }
+
+        let authMessage = AuthMessage(password: "secret123")
+        let authData = try JSONEncoder().encode(authMessage)
+        task.send(.string(String(data: authData, encoding: .utf8)!)) { _ in }
+
+        // Nothing should arrive on the wire until the host decides.
+        wait(for: [requestExpectation, prematureConnectExpectation], timeout: 0.5)
+
+        server.approveConnection()
+        wait(for: [connectedExpectation], timeout: 5.0)
+    }
+
+    func testHostCanDeclineAConnectionRequest() throws {
+        let server = WebSocketServer()
+        server.screenSizeProvider = { () in (width: 100, height: 100) }
+        let port = randomPort()
+        try server.start(port: port, password: "secret123")
+        defer { server.stop() }
+
+        let requestExpectation = expectation(description: "connection request raised")
+        server.onConnectionRequest = { _ in
+            server.declineConnection()
+            requestExpectation.fulfill()
+        }
+
+        let session = URLSession(configuration: .default)
+        let task = session.webSocketTask(with: URL(string: "ws://127.0.0.1:\(port)/")!)
+        task.resume()
+        defer { task.cancel(with: .normalClosure, reason: nil) }
+
+        let authMessage = AuthMessage(password: "secret123")
+        let authData = try JSONEncoder().encode(authMessage)
+        task.send(.string(String(data: authData, encoding: .utf8)!)) { _ in }
+        wait(for: [requestExpectation], timeout: 5.0)
+
+        let authFailExpectation = expectation(description: "received auth-fail after decline")
+        task.receive { result in
+            if case .success(.string(let text)) = result,
+               let data = text.data(using: .utf8),
+               let envelope = try? JSONDecoder().decode(TypeEnvelope.self, from: data) {
+                XCTAssertEqual(envelope.type, "auth-fail")
+                authFailExpectation.fulfill()
+            }
+        }
+        wait(for: [authFailExpectation], timeout: 5.0)
+    }
+
     func testSecondViewerIsRejectedAsBusy() throws {
         let server = WebSocketServer()
         server.screenSizeProvider = { () in (width: 100, height: 100) }
@@ -88,6 +161,7 @@ final class WebSocketServerAuthTests: XCTestCase {
 
         let firstConnected = expectation(description: "first viewer connected")
         server.onViewerConnected = { firstConnected.fulfill() }
+        server.onConnectionRequest = { _ in server.approveConnection() }
 
         let session = URLSession(configuration: .default)
         let firstTask = session.webSocketTask(with: URL(string: "ws://127.0.0.1:\(port)/")!)

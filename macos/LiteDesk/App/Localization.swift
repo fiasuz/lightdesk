@@ -72,6 +72,13 @@ enum LocalizedKey: String {
     case timeLabel
     case monitoringTitle
     case trafficLabel
+    case screenRecordingRelaunchMessage
+    case relaunchButton
+    case connectionRequestTitle
+    case connectionRequestMessage
+    case connectionRequestFromLabel
+    case approveConnectionButton
+    case declineConnectionButton
 }
 
 enum LocalizedStrings {
@@ -195,6 +202,41 @@ enum LocalizedStrings {
             .uz: "Trafik",
             .ru: "Трафик",
             .en: "Traffic",
+        ],
+        .screenRecordingRelaunchMessage: [
+            .uz: "Ekranni yozib olish ruxsati berildi, lekin kuchga kirishi uchun ilovani qayta ishga tushirish kerak.",
+            .ru: "Доступ к записи экрана предоставлен, но для вступления в силу приложение нужно перезапустить.",
+            .en: "Screen Recording access was granted, but the app needs to restart for it to take effect.",
+        ],
+        .relaunchButton: [
+            .uz: "Ilovani qayta ishga tushirish",
+            .ru: "Перезапустить приложение",
+            .en: "Restart app",
+        ],
+        .connectionRequestTitle: [
+            .uz: "Ulanish so'rovi",
+            .ru: "Запрос на подключение",
+            .en: "Connection request",
+        ],
+        .connectionRequestMessage: [
+            .uz: "Kimdir sizga ulanishni so'ramoqda. Ruxsat berasizmi?",
+            .ru: "Кто-то запрашивает подключение к вам. Разрешить?",
+            .en: "Someone is requesting to connect to you. Allow it?",
+        ],
+        .connectionRequestFromLabel: [
+            .uz: "Manba",
+            .ru: "Источник",
+            .en: "From",
+        ],
+        .approveConnectionButton: [
+            .uz: "Ruxsat berish",
+            .ru: "Разрешить",
+            .en: "Allow",
+        ],
+        .declineConnectionButton: [
+            .uz: "Rad etish",
+            .ru: "Отклонить",
+            .en: "Decline",
         ],
     ]
 }

@@ -171,6 +171,6 @@ urinishdan oldin ~500ms sun'iy kechikish qo'shildi (`swift test`da sinaldi).
   bo'limlariga qarang) — o'z relay/signaling serveringiz kerak emas.
 - Bir vaqtning o'zida faqat bitta viewer ulana oladi.
 - Klaviatura orqali boshqarish yo'q, faqat sichqoncha.
-- Video H.264 kabi kodek bilan emas, oddiy JPEG kadrlar (~8 fps) orqali uzatiladi —
+- Video H.264 kabi kodek bilan emas, oddiy JPEG kadrlar (~30 fps) orqali uzatiladi —
   tez va sodda, lekin AnyDesk darajasidagi silliqlikni bermaydi.
 - Faqat asosiy (primary) ekran ulashiladi.

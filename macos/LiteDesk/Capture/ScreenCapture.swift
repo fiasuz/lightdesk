@@ -3,7 +3,7 @@ import CoreImage
 import CoreMedia
 import AppKit
 
-/// Captures the primary display only, at ~8fps, pushing JPEG-encoded frames out
+/// Captures the primary display only, at ~30fps, pushing JPEG-encoded frames out
 /// via `onFrame`. Deliberately started/stopped by the caller (HostSession) only
 /// while a viewer is connected, rather than continuously — an efficiency win
 /// over the old Electron app, which captured whenever host mode was "on".
@@ -35,7 +35,7 @@ final class ScreenCapture: NSObject, SCStreamOutput, SCStreamDelegate {
                 let config = SCStreamConfiguration()
                 config.width = display.width
                 config.height = display.height
-                config.minimumFrameInterval = CMTime(value: 1, timescale: 8)
+                config.minimumFrameInterval = CMTime(value: 1, timescale: 30)
                 config.pixelFormat = kCVPixelFormatType_32BGRA
                 config.showsCursor = true
                 config.queueDepth = 3

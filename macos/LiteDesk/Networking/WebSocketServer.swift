@@ -24,6 +24,10 @@ final class WebSocketServer {
         var handshakeBuffer = Data()
         var handshakeComplete = false
         var authenticated = false
+        /// Password matched but the host hasn't approved or declined yet —
+        /// blocks re-processing further "auth" messages from this client
+        /// while its request sits in front of the host (see `handleAuth`).
+        var awaitingApproval = false
         let decoder = WebSocketFrameDecoder()
 
         init(connection: NWConnection) {
@@ -34,6 +38,10 @@ final class WebSocketServer {
     private var listener: NWListener?
     private var pendingConnections: [ObjectIdentifier: ClientConnection] = [:]
     private var viewer: ClientConnection?
+    /// The client whose password matched and is now waiting on the host's
+    /// approve/decline decision (see `onConnectionRequest`). Counts as
+    /// occupying the single connection slot, same as `viewer`.
+    private var pendingApproval: ClientConnection?
     private var password: String = ""
     private let queue = DispatchQueue(label: "com.litedesk.wsserver")
 
@@ -52,6 +60,14 @@ final class WebSocketServer {
 
     var onViewerConnected: (() -> Void)?
     var onViewerDisconnected: (() -> Void)?
+    /// Fired once a connecting client's password checks out, carrying its
+    /// remote IP (nil if it couldn't be determined) — the host must call
+    /// `approveConnection()` or `declineConnection()` in response before the
+    /// session actually starts.
+    var onConnectionRequest: ((String?) -> Void)?
+    /// Fired if the client awaiting approval disconnects before the host
+    /// responds, so the host UI can dismiss the prompt on its own.
+    var onConnectionRequestCancelled: (() -> Void)?
     var onMouseMessage: ((MouseMessage) -> Void)?
     var onKeyMessage: ((KeyMessage) -> Void)?
     var onPongMessage: ((Double) -> Void)?
@@ -91,10 +107,52 @@ final class WebSocketServer {
             guard let self else { return }
             self.viewer?.connection.cancel()
             self.viewer = nil
+            self.pendingApproval?.connection.cancel()
+            self.pendingApproval = nil
             for (_, client) in self.pendingConnections { client.connection.cancel() }
             self.pendingConnections.removeAll()
             self.listener?.cancel()
             self.listener = nil
+        }
+    }
+
+    /// The host approved the connection currently awaiting a decision —
+    /// finishes what `handleAuth` used to do immediately: mark it as the
+    /// viewer, send `auth-ok`, and let capture start.
+    func approveConnection() {
+        queue.async { [weak self] in
+            guard let self, let client = self.pendingApproval else { return }
+            self.pendingApproval = nil
+            client.authenticated = true
+            self.viewer = client
+
+            let size = self.screenSizeProvider?() ?? (width: 0, height: 0)
+            let ok = AuthOkMessage(width: size.width, height: size.height)
+            if let data = try? JSONEncoder().encode(ok) {
+                let frame = WebSocketFrameEncoder.encodeText(data)
+                client.connection.send(content: frame, completion: .contentProcessed { _ in })
+            }
+            self.onViewerConnected?()
+        }
+    }
+
+    /// The host declined the connection currently awaiting a decision.
+    /// Reuses `auth-fail` — a viewer already knows how to render it as a
+    /// rejected connection attempt — rather than adding a new wire message
+    /// that older/other-platform viewers wouldn't understand.
+    func declineConnection() {
+        queue.async { [weak self] in
+            guard let self, let client = self.pendingApproval else { return }
+            self.pendingApproval = nil
+            let fail = AuthFailMessage()
+            guard let data = try? JSONEncoder().encode(fail) else {
+                client.connection.cancel()
+                return
+            }
+            let frame = WebSocketFrameEncoder.encodeText(data)
+            client.connection.send(content: frame, completion: .contentProcessed { _ in
+                client.connection.cancel()
+            })
         }
     }
 
@@ -144,6 +202,10 @@ final class WebSocketServer {
 
     private func cleanup(_ client: ClientConnection) {
         pendingConnections.removeValue(forKey: ObjectIdentifier(client.connection))
+        if pendingApproval === client {
+            pendingApproval = nil
+            onConnectionRequestCancelled?()
+        }
         if viewer === client {
             viewer = nil
             onViewerDisconnected?()
@@ -213,9 +275,10 @@ final class WebSocketServer {
                 self.cleanup(client)
                 return
             }
-            if self.viewer != nil {
-                // Only one viewer at a time — reject with a proper close frame, matching
-                // the Electron app's socket.close(1000, 'busy').
+            if self.viewer != nil || self.pendingApproval != nil {
+                // Only one connection slot at a time — awaiting approval counts as
+                // occupying it too. Reject with a proper close frame, matching the
+                // Electron app's socket.close(1000, 'busy').
                 let closeFrame = WebSocketFrameEncoder.encodeClose(code: 1000, reason: "busy")
                 client.connection.send(content: closeFrame, completion: .contentProcessed { _ in
                     client.connection.cancel()
@@ -336,6 +399,7 @@ final class WebSocketServer {
     }
 
     private func handleAuth(_ payload: Data, client: ClientConnection) {
+        guard !client.awaitingApproval else { return }
         guard let envelope = try? JSONDecoder().decode(TypeEnvelope.self, from: payload), envelope.type == "auth" else {
             return
         }
@@ -363,17 +427,13 @@ final class WebSocketServer {
 
         if let ip { authAttempts.removeValue(forKey: ip) }
 
-        client.authenticated = true
-        viewer = client
+        // Password matches, but don't finish the connection yet — park it
+        // and let the host approve or decline first (see `approveConnection`
+        // / `declineConnection`).
+        client.awaitingApproval = true
         pendingConnections.removeValue(forKey: ObjectIdentifier(client.connection))
-
-        let size = screenSizeProvider?() ?? (width: 0, height: 0)
-        let ok = AuthOkMessage(width: size.width, height: size.height)
-        if let data = try? JSONEncoder().encode(ok) {
-            let frame = WebSocketFrameEncoder.encodeText(data)
-            client.connection.send(content: frame, completion: .contentProcessed { _ in })
-        }
-        onViewerConnected?()
+        pendingApproval = client
+        onConnectionRequest?(ip)
     }
 
     // MARK: - Brute-force protection

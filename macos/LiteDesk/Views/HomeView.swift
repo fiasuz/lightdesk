@@ -22,6 +22,14 @@ struct HomeView: View {
                 mainLayout
             }
         }
+        // At the top level (not inside MyAddressPanel) so an incoming request
+        // is still visible even while this Mac is itself the outgoing viewer
+        // on someone else's screen.
+        .overlay {
+            if let address = hostSession.connectionRequestAddress {
+                ConnectionRequestOverlay(address: address, session: hostSession)
+            }
+        }
         .onAppear {
             hostSession.startIfNeeded()
         }
@@ -208,6 +216,10 @@ private struct MyAddressPanel: View {
                 connectedStatus
             }
 
+            if session.screenRecordingNeedsRelaunch {
+                relaunchBanner
+            }
+
             if let error = session.errorMessage {
                 Text(error).font(.system(size: 12)).foregroundColor(Palette.err)
             }
@@ -242,6 +254,18 @@ private struct MyAddressPanel: View {
             Text("\(loc.t(.fpsLabel)) \(Int(session.outgoingFps))")
                 .font(.system(size: 12)).foregroundColor(Palette.subtitle)
         }
+    }
+
+    private var relaunchBanner: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(loc.t(.screenRecordingRelaunchMessage))
+                .font(.system(size: 12.5))
+                .foregroundColor(Palette.err)
+            Button(loc.t(.relaunchButton)) { session.relaunchApp() }
+                .buttonStyle(.blueprintSecondary)
+        }
+        .padding(12)
+        .blueprintPanel()
     }
 
     private func copyCode() {
@@ -351,6 +375,43 @@ private struct ConnectPanel: View {
             address.removeFirst(prefix.count)
         }
         return address.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    }
+}
+
+/// Modal confirmation shown to the host when an incoming connection's
+/// password checks out — the session only starts once this is answered
+/// (see `WebSocketServer.onConnectionRequest` / `approveConnection`).
+private struct ConnectionRequestOverlay: View {
+    let address: String
+    @ObservedObject var session: HostSession
+    @EnvironmentObject var loc: LocalizationManager
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.35).ignoresSafeArea()
+            VStack(alignment: .leading, spacing: 14) {
+                Text(loc.t(.connectionRequestTitle)).heading(17)
+                Text(loc.t(.connectionRequestMessage))
+                    .font(.system(size: 13))
+                    .foregroundColor(Palette.subtitle)
+                HStack(spacing: 6) {
+                    Text(loc.t(.connectionRequestFromLabel)).eyebrow(11).foregroundColor(Palette.subtitle)
+                    Text(address)
+                        .font(.system(size: 12.5, design: .monospaced))
+                        .foregroundColor(Palette.text)
+                }
+                HStack(spacing: 8) {
+                    Button(loc.t(.declineConnectionButton)) { session.declineConnectionRequest() }
+                        .buttonStyle(.blueprintSecondary)
+                    Button(loc.t(.approveConnectionButton)) { session.approveConnectionRequest() }
+                        .buttonStyle(.blueprintPrimary)
+                }
+            }
+            .padding(20)
+            .frame(width: 340, alignment: .leading)
+            .background(Palette.background)
+            .blueprintPanel()
+        }
     }
 }
 

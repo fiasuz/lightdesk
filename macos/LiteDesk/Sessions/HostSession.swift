@@ -9,10 +9,18 @@ final class HostSession: ObservableObject {
     @Published var errorMessage: String?
     @Published var pin: String = ""
     @Published var permissions = PermissionsChecker.currentStatus()
+    /// True once we've re-checked Screen Recording after already having
+    /// requested it this launch and it's still not granted — see
+    /// `start(password:)` for why we stop re-prompting at that point.
+    @Published var screenRecordingNeedsRelaunch = false
     @Published var tunnelState: CloudflaredTunnelManager.TunnelState = .idle
     @Published var pingMs: Double?
     @Published var outgoingFps: Double = 0
     @Published var outgoingKbps: Double = 0
+    /// Non-nil while a client with a correct password is waiting on our
+    /// approve/decline decision — its remote address, for display. The UI
+    /// shows a confirmation prompt whenever this is set.
+    @Published var connectionRequestAddress: String?
 
     /// Every Cloudflare quick tunnel lives under this domain — the code shown
     /// to the user strips it off (see `connectionCode(pin:tunnelURL:)`), and
@@ -25,6 +33,10 @@ final class HostSession: ObservableObject {
     private let keyInjector = KeyInjector()
     private let tunnelManager = CloudflaredTunnelManager()
     private var cancellables = Set<AnyCancellable>()
+
+    /// Whether we've already fired `CGRequestScreenCaptureAccess()` once
+    /// this process launch — see `start(password:)`.
+    private var hasRequestedScreenRecordingThisLaunch = false
 
     private var statsTimer: Timer?
     private var pingTimer: Timer?
@@ -53,6 +65,12 @@ final class HostSession: ObservableObject {
         }
         server.onError = { [weak self] message in
             DispatchQueue.main.async { self?.errorMessage = message }
+        }
+        server.onConnectionRequest = { [weak self] ip in
+            DispatchQueue.main.async { self?.connectionRequestAddress = ip ?? "—" }
+        }
+        server.onConnectionRequestCancelled = { [weak self] in
+            DispatchQueue.main.async { self?.connectionRequestAddress = nil }
         }
         server.onMouseMessage = { [weak self] message in
             guard let self else { return }
@@ -90,6 +108,21 @@ final class HostSession: ObservableObject {
 
     func refreshPermissions() {
         permissions = PermissionsChecker.currentStatus()
+        if permissions.screenRecording {
+            screenRecordingNeedsRelaunch = false
+        }
+    }
+
+    /// Screen Recording grants only take effect in a freshly launched
+    /// process — macOS doesn't propagate them into one that's already
+    /// running — so this re-launches the same `.app` and quits this
+    /// instance, offered once `screenRecordingNeedsRelaunch` is set.
+    func relaunchApp() {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        task.arguments = [Bundle.main.bundlePath]
+        try? task.run()
+        NSApp.terminate(nil)
     }
 
     /// Fixed local bind port for the WebSocket server / tunnel forward target
@@ -119,13 +152,24 @@ final class HostSession: ObservableObject {
         // Proactively request whatever's missing (rather than only showing a
         // banner) — hosting starts automatically, so this is effectively the
         // app's first-launch permission prompt.
+        refreshPermissions()
         if !permissions.screenRecording {
-            PermissionsChecker.requestScreenRecordingAccess()
+            // CGPreflightScreenCaptureAccess() never flips to true inside a
+            // process that's already running, even right after the user
+            // grants it in System Settings — only a relaunch picks it up.
+            // So re-requesting here on every subsequent start() (e.g. every
+            // "Yangi manzil" click) would just reopen the same dialog
+            // forever. Ask once per launch, then point at a relaunch.
+            if hasRequestedScreenRecordingThisLaunch {
+                screenRecordingNeedsRelaunch = true
+            } else {
+                hasRequestedScreenRecordingThisLaunch = true
+                PermissionsChecker.requestScreenRecordingAccess()
+            }
         }
         if !permissions.accessibility {
             PermissionsChecker.requestAccessibilityAccess()
         }
-        refreshPermissions()
 
         do {
             try server.start(port: port, password: password)
@@ -143,6 +187,19 @@ final class HostSession: ObservableObject {
         stopLiveStatsTracking()
         isRunning = false
         viewerConnected = false
+        connectionRequestAddress = nil
+    }
+
+    /// The host allowed the pending connection request through.
+    func approveConnectionRequest() {
+        connectionRequestAddress = nil
+        server.approveConnection()
+    }
+
+    /// The host turned down the pending connection request.
+    func declineConnectionRequest() {
+        connectionRequestAddress = nil
+        server.declineConnection()
     }
 
     /// The single code shared with the other side: "<PIN>-<tunnel subdomain,
@@ -200,8 +257,8 @@ final class HostSession: ObservableObject {
     }
 
     /// Counts real captured/sent frames — `ScreenCapture` genuinely produces
-    /// frames at ~8fps, so this reports the actual outgoing rate, not a
-    /// fixed/fake number.
+    /// frames at up to ~30fps, so this reports the actual outgoing rate, not
+    /// a fixed/fake number.
     private func recordOutgoingFrame(bytes: Int) {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }

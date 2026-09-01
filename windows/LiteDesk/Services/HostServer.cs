@@ -31,6 +31,13 @@ public sealed class HostServer
     private WebSocket? _viewerSocket;
     private string _password = "";
 
+    // Set while a client's password has checked out but the host hasn't
+    // approved or declined it yet (see ConnectionRequested / ApproveConnection
+    // / DeclineConnection). Counts as occupying the single connection slot,
+    // same as _viewerSocket, so a second connection attempt during the wait
+    // is still rejected as busy.
+    private TaskCompletionSource<bool>? _pendingApprovalTcs;
+
     // Exposing the WebSocket server to the whole internet via a Cloudflare
     // Tunnel (see CloudflareTunnelService) turns the previously-harmless
     // "no rate limiting" PIN check into a real brute-force risk. Track
@@ -52,6 +59,11 @@ public sealed class HostServer
     public event Action? ViewerDisconnected;
     public event Action<string>? ServerError;
     public event Action<WireMessage>? MouseMessageReceived;
+    // Fired once a connecting client's password checks out, carrying its
+    // remote address (null if it couldn't be determined) — the host must
+    // call ApproveConnection() or DeclineConnection() before the session
+    // actually starts.
+    public event Action<string?>? ConnectionRequested;
 
     // RTT (ms) measured from a pong that echoed a ping this host sent — see
     // SendPingAsync(). OutgoingStatsUpdated reports real capture throughput
@@ -171,8 +183,31 @@ public sealed class HostServer
 
         lock (_viewerLock)
         {
+            // Unblocks any RunConnectionAsync currently awaiting a decision.
+            _pendingApprovalTcs?.TrySetResult(false);
+            _pendingApprovalTcs = null;
             try { _viewerSocket?.Abort(); } catch { /* ignore */ }
             _viewerSocket = null;
+        }
+    }
+
+    /// The host allowed the connection currently awaiting a decision through.
+    public void ApproveConnection()
+    {
+        lock (_viewerLock)
+        {
+            _pendingApprovalTcs?.TrySetResult(true);
+            _pendingApprovalTcs = null;
+        }
+    }
+
+    /// The host turned down the connection currently awaiting a decision.
+    public void DeclineConnection()
+    {
+        lock (_viewerLock)
+        {
+            _pendingApprovalTcs?.TrySetResult(false);
+            _pendingApprovalTcs = null;
         }
     }
 
@@ -246,12 +281,13 @@ public sealed class HostServer
                 stream, isServer: true, subProtocol: null, keepAliveInterval: TimeSpan.Zero);
 
             bool busy;
-            lock (_viewerLock) { busy = _viewerSocket is not null; }
+            lock (_viewerLock) { busy = _viewerSocket is not null || _pendingApprovalTcs is not null; }
 
             if (busy)
             {
                 // Matches src/main.js: socket.close(1000, 'busy') for any
-                // connection attempt while one viewer is already active.
+                // connection attempt while one viewer is already active or
+                // another one is awaiting the host's approval.
                 try
                 {
                     await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "busy", ct).ConfigureAwait(false);
@@ -302,10 +338,59 @@ public sealed class HostServer
 
                 if (auth.Password == _password)
                 {
-                    authenticated = true;
                     ClearAuthFailures(remoteAddress);
+
+                    // Password matches, but don't finish the connection yet —
+                    // park it and let the host approve or decline first.
+                    var approvalTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    lock (_viewerLock) { _pendingApprovalTcs = approvalTcs; }
+                    ConnectionRequested?.Invoke(remoteAddress?.ToString());
+
+                    bool approved;
+                    try
+                    {
+                        approved = await approvalTcs.Task.WaitAsync(ct).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Server stopped (or the connection's own token fired)
+                        // while the request was still pending.
+                        break;
+                    }
+                    finally
+                    {
+                        lock (_viewerLock)
+                        {
+                            if (ReferenceEquals(_pendingApprovalTcs, approvalTcs)) _pendingApprovalTcs = null;
+                        }
+                    }
+
+                    if (!approved)
+                    {
+                        // Reuses auth-fail — a viewer already knows how to
+                        // render it as a rejected connection attempt — rather
+                        // than adding a new wire message an older/other-
+                        // platform viewer wouldn't understand.
+                        try
+                        {
+                            await SendJsonAsync(socket, new AuthFailMessage(), ct).ConfigureAwait(false);
+                            await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, ct).ConfigureAwait(false);
+                        }
+                        catch { /* client likely already gone */ }
+                        break;
+                    }
+
+                    authenticated = true;
                     (int w, int h) = ScreenCapture.GetPrimaryMonitorSize();
-                    await SendJsonAsync(socket, new AuthOkMessage { Width = w, Height = h }, ct).ConfigureAwait(false);
+                    try
+                    {
+                        await SendJsonAsync(socket, new AuthOkMessage { Width = w, Height = h }, ct).ConfigureAwait(false);
+                    }
+                    catch
+                    {
+                        // Client disconnected while the host was deciding.
+                        break;
+                    }
 
                     lock (_viewerLock) { _viewerSocket = socket; }
                     ViewerConnected?.Invoke();

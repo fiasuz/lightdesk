@@ -7,13 +7,13 @@ namespace LiteDesk.Services;
 
 // Primary-monitor screen capture via GDI BitBlt, encoded as JPEG through
 // WPF's WIC-backed JpegBitmapEncoder. Runs on a System.Threading.Timer at
-// ~8fps (125ms) — HostServer starts/stops this on ViewerConnected /
+// ~30fps (33ms) — HostServer starts/stops this on ViewerConnected /
 // ViewerDisconnected so no capture happens (no CPU/GDI cost) while nobody
 // is watching, which the Electron app does not do (it captures continuously
 // whenever host mode is "started").
 public sealed class ScreenCapture
 {
-    private const int FrameIntervalMs = 125; // 1000/8 ≈ 8fps, matching the current app
+    private const int FrameIntervalMs = 33; // 1000/30 ≈ 30fps
     private const int JpegQuality = 50; // matches canvas.toBlob('image/jpeg', 0.5)
 
     private readonly object _stateLock = new();
@@ -58,7 +58,7 @@ public sealed class ScreenCapture
     private void CaptureTick(int width, int height)
     {
         // Timer callbacks can overlap if a capture+encode takes longer than
-        // the 125ms period; skip this tick rather than letting captures
+        // the 33ms period; skip this tick rather than letting captures
         // pile up on the thread pool.
         lock (_stateLock)
         {
@@ -124,7 +124,7 @@ public sealed class ScreenCapture
         }
         finally
         {
-            // Careful, ordered cleanup — this runs 8x/sec, so any leak here
+            // Careful, ordered cleanup — this runs ~30x/sec, so any leak here
             // exhausts the process's GDI handle quota (default 10,000/process)
             // within minutes: deselect `bitmap` from memDC before deleting
             // it, then delete the memory DC, then release the screen DC
