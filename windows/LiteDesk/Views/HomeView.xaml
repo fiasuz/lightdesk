@@ -16,10 +16,7 @@
                 <!-- Header + language switch -->
                 <Grid Margin="0,0,0,28">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
-                        <TextBlock Text="LITEDESK" FontFamily="{StaticResource HeadingFont}" FontSize="34"
-                                   Foreground="{StaticResource TextBrush}"/>
-                        <TextBlock Text="{Binding Source={x:Static loc:LocalizationManager.Instance}, Path=[Home.Subtitle]}"
-                                   Style="{StaticResource KickerText}" Margin="16,0,0,4" VerticalAlignment="Bottom"/>
+                        <Image Source="/Assets/logo.png" Height="44" Stretch="Uniform"/>
                     </StackPanel>
                     <ComboBox x:Name="LanguageCombo" HorizontalAlignment="Right" VerticalAlignment="Bottom" Width="150"
                               SelectionChanged="LanguageCombo_SelectionChanged">
