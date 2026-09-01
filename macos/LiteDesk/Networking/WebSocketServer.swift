@@ -54,6 +54,7 @@ final class WebSocketServer {
     var onViewerDisconnected: (() -> Void)?
     var onMouseMessage: ((MouseMessage) -> Void)?
     var onKeyMessage: ((KeyMessage) -> Void)?
+    var onPongMessage: ((Double) -> Void)?
     var onError: ((String) -> Void)?
 
     /// Called to obtain the width/height reported in auth-ok. Point-space on macOS
@@ -101,6 +102,19 @@ final class WebSocketServer {
         queue.async { [weak self] in
             guard let self, let viewer = self.viewer, viewer.authenticated else { return }
             let frame = WebSocketFrameEncoder.encodeBinary(jpegData)
+            viewer.connection.send(content: frame, completion: .contentProcessed { _ in })
+        }
+    }
+
+    /// Sends a ping carrying the current time; the viewer echoes it back in a
+    /// "pong" (see `handleText`), letting `onPongMessage` report round-trip
+    /// latency for the live session stats.
+    func sendPing() {
+        queue.async { [weak self] in
+            guard let self, let viewer = self.viewer, viewer.authenticated else { return }
+            let ping = PingMessage(ts: Date().timeIntervalSince1970)
+            guard let data = try? JSONEncoder().encode(ping) else { return }
+            let frame = WebSocketFrameEncoder.encodeText(data)
             viewer.connection.send(content: frame, completion: .contentProcessed { _ in })
         }
     }
@@ -267,6 +281,22 @@ final class WebSocketServer {
             handleAuth(payload, client: client)
             return
         }
+        if let envelope = try? JSONDecoder().decode(TypeEnvelope.self, from: payload) {
+            switch envelope.type {
+            case "ping":
+                if let ping = try? JSONDecoder().decode(PingMessage.self, from: payload) {
+                    replyPong(ts: ping.ts, client: client)
+                }
+                return
+            case "pong":
+                if let pong = try? JSONDecoder().decode(PongMessage.self, from: payload) {
+                    onPongMessage?(pong.ts)
+                }
+                return
+            default:
+                break
+            }
+        }
         // TEMP DIAGNOSTIC — remove once the live-move bug is root-caused.
         WebSocketServer.debugLog("RECV \(String(data: payload, encoding: .utf8) ?? "<non-utf8>")")
         if let message = MouseMessage.parse(payload) {
@@ -276,6 +306,13 @@ final class WebSocketServer {
         } else {
             WebSocketServer.debugLog("PARSE FAILED for above payload")
         }
+    }
+
+    private func replyPong(ts: Double, client: ClientConnection) {
+        let pong = PongMessage(ts: ts)
+        guard let data = try? JSONEncoder().encode(pong) else { return }
+        let frame = WebSocketFrameEncoder.encodeText(data)
+        client.connection.send(content: frame, completion: .contentProcessed { _ in })
     }
 
     // TEMP DIAGNOSTIC — remove once the live-move bug is root-caused.

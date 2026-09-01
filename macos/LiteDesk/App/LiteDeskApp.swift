@@ -14,14 +14,14 @@ struct LiteDeskMain {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: NSWindow?
-    private let appState = AppState()
+    private let localization = LocalizationManager()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let root = RootView().environmentObject(appState)
+        let root = RootView().environmentObject(localization).preferredColorScheme(.light)
         let hosting = NSHostingView(rootView: root)
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 900, height: 620),
+            contentRect: NSRect(x: 0, y: 0, width: 980, height: 660),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false

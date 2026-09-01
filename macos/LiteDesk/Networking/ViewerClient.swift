@@ -15,6 +15,7 @@ final class ViewerClient {
     var onAuthResult: ((ViewerAuthOutcome) -> Void)?
     var onFrame: ((Data) -> Void)?
     var onDisconnected: (() -> Void)?
+    var onPongTimestamp: ((Double) -> Void)?
 
     /// Connects to a Cloudflare Tunnel hostname over `wss://` — the tunnel
     /// terminates TLS at its edge, so the scheme's default port (443)
@@ -44,6 +45,15 @@ final class ViewerClient {
 
     func sendMouseEvent<T: Encodable>(_ message: T) {
         guard let data = try? JSONEncoder().encode(message), let text = String(data: data, encoding: .utf8) else { return }
+        task?.send(.string(text)) { _ in }
+    }
+
+    /// Sends a ping carrying the current time; the host echoes it back in a
+    /// "pong" (see `handleText`), letting `onPongTimestamp` report round-trip
+    /// latency for the live session stats.
+    func sendPing() {
+        let ping = PingMessage(ts: Date().timeIntervalSince1970)
+        guard let data = try? JSONEncoder().encode(ping), let text = String(data: data, encoding: .utf8) else { return }
         task?.send(.string(text)) { _ in }
     }
 
@@ -94,8 +104,22 @@ final class ViewerClient {
             }
         case "auth-fail":
             onAuthResult?(.failure("Parol noto'g'ri"))
+        case "ping":
+            if let ping = try? JSONDecoder().decode(PingMessage.self, from: data) {
+                replyPong(ts: ping.ts)
+            }
+        case "pong":
+            if let pong = try? JSONDecoder().decode(PongMessage.self, from: data) {
+                onPongTimestamp?(pong.ts)
+            }
         default:
             break
         }
+    }
+
+    private func replyPong(ts: Double) {
+        let pong = PongMessage(ts: ts)
+        guard let data = try? JSONEncoder().encode(pong), let text = String(data: data, encoding: .utf8) else { return }
+        task?.send(.string(text)) { _ in }
     }
 }

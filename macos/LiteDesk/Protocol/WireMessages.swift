@@ -108,6 +108,24 @@ struct KeyUpMessage: Codable {
     enum CodingKeys: String, CodingKey { case type, code }
 }
 
+// Bidirectional keepalive used to measure round-trip latency: either side may
+// send "ping" with its own current time; the other echoes it back unchanged
+// in "pong", and the sender computes RTT = now - ts. Sent over the same JSON
+// text channel as auth/mouse/key messages.
+struct PingMessage: Codable {
+    let type = "ping"
+    let ts: Double
+
+    enum CodingKeys: String, CodingKey { case type, ts }
+}
+
+struct PongMessage: Codable {
+    let type = "pong"
+    let ts: Double
+
+    enum CodingKeys: String, CodingKey { case type, ts }
+}
+
 enum KeyMessage {
     case down(code: String)
     case up(code: String)
