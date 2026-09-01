@@ -12,10 +12,10 @@ BUILD_DIR="$MACOS_DIR/build"
 DIST_DIR="$MACOS_DIR/dist"
 APP_DIR="$BUILD_DIR/LiteDesk.app"
 
-echo "==> swift build -c release"
-(cd "$MACOS_DIR" && swift build -c release)
+echo "==> swift build -c release (universal: arm64 + x86_64)"
+(cd "$MACOS_DIR" && swift build -c release --arch arm64 --arch x86_64)
 
-BINARY_PATH="$MACOS_DIR/.build/release/LiteDesk"
+BINARY_PATH="$MACOS_DIR/.build/apple/Products/Release/LiteDesk"
 if [ ! -f "$BINARY_PATH" ]; then
     echo "error: release binary not found at $BINARY_PATH" >&2
     exit 1
